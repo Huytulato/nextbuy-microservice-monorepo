@@ -1,0 +1,42 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Auth Service",
+    "description": "Automatically generated swagger doc",
+    "version": "1.0.0"
+  },
+  "host": "localhost:6001",
+  "basePath": "/",
+  "schemes": [
+    "http"
+  ],
+  "paths": {
+    "/api/user-registration": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "example": "nextbuy"
+                },
+                "email": {
+                  "example": "mysuperdream100@gmail.com"
+                }             
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    }
+  }
+}
