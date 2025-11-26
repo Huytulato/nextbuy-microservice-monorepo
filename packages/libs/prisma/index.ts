@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client"; // import PrismaClient from Prisma ORM
 
 declare global {
   namespace globalThis {

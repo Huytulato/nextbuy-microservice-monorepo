@@ -1,9 +1,9 @@
-import nodemailer from 'nodemailer';
-import dotenv from 'dotenv';
-import ejs from 'ejs';
-import path from 'path';
+import nodemailer from 'nodemailer'; // import nodemailer to send emails
+import dotenv from 'dotenv'; // import dotenv to manage environment variables
+import ejs from 'ejs'; // import ejs to render email templates  
+import path from 'path'; // import path to handle file paths
 
-dotenv.config();
+dotenv.config(); // load environment variables from .env file
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
