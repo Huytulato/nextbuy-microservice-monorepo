@@ -95,6 +95,8 @@ export const handleForgotPassword = async (req:any, res:any, next:NextFunction, 
   }
 };
 
+
+
 export const verifyForgotPasswordOtp = async (req:any, res:any, next:NextFunction) => {
   try {
     const { email, otp } = req.body;

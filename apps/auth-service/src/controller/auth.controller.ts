@@ -109,6 +109,64 @@ export const loginUser = async (req:Request,res:Response,next:NextFunction) => {
   }
 };
 
+// Refresh user tokens
+export const refreshUserTokens = async (req:Request,res:Response,next:NextFunction) => {
+  try {
+    const refreshToken = req.cookies.refreshToken;
+    if (!refreshToken) {
+      throw new ValidationError('Unauthorized: No refresh token provided');
+    }
+
+    // verify refresh token
+    const decoded:any = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET as string) as {id: string, role: string};
+    
+    if (!decoded || !decoded.id || !decoded.role){
+      throw new AuthError('Invalid token');
+    }
+
+    const user = await prisma.users.findUnique({
+      where: { id: decoded.id }
+    });
+
+    if (!user) {
+      return next(new AuthError('User not found'));
+    } 
+
+    // Generate new access and refresh tokens
+    const newAccessToken = jwt.sign({id: user.id, role: "user"}, process.env.ACCESS_TOKEN_SECRET as string, { expiresIn: '15m' });
+    const newRefreshToken = jwt.sign({id: user.id, role: "user"}, process.env.REFRESH_TOKEN_SECRET as string, { expiresIn: '7d' });
+
+    // store the new tokens in httpOnly secure cookies
+    setCookie(res, "refreshToken", newRefreshToken);
+    setCookie(res, "accessToken", newAccessToken);
+    // send response
+    res.status(201).json({
+      success: true,
+      message: "Tokens refreshed successfully",
+      data: {
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken
+      }
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// Get logged in user 
+export const getUser = async (req:any,res:Response,next:NextFunction) => {
+  try {
+    const user = req.user;
+    res.status(201).json({
+      success: true,
+      user,
+    });
+
+  } catch (error) {
+    next(error);
+  }
+}
+
 // user forgot password
 export const forgotPassword = async (req:Request,res:Response,next:NextFunction) => {
   await handleForgotPassword(req, res, next, "user");

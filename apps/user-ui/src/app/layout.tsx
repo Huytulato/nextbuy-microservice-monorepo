@@ -2,6 +2,7 @@ import Header from '../shared/widgets/header';
 import './global.css';
 import {Poppins, Roboto} from 'next/font/google';
 import Providers from './providers';
+import type { ReactNode } from 'react';
 export const metadata = {
   title: 'Welcome to NextBuy!',
   description: 'An e-commerce platform built with Next.js and TypeScript',
@@ -23,7 +24,7 @@ const roboto = Roboto({
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: ReactNode
 }) {
   return (
     <html lang="en">
