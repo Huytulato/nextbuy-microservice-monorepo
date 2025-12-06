@@ -1,0 +1,587 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Product Service API",
+    "description": "API documentation for Product Service - NextBuy E-commerce Platform",
+    "version": "1.0.0"
+  },
+  "host": "localhost:6002",
+  "basePath": "/api",
+  "schemes": [
+    "http"
+  ],
+  "securityDefinitions": {
+    "bearerAuth": {
+      "type": "apiKey",
+      "name": "Authorization",
+      "in": "header",
+      "description": "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\""
+    }
+  },
+  "tags": [
+    {
+      "name": "Health",
+      "description": "Health check endpoints"
+    },
+    {
+      "name": "Products",
+      "description": "Product management operations"
+    },
+    {
+      "name": "Categories",
+      "description": "Category management operations"
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Health check",
+        "description": "Check if the product service is running",
+        "responses": {
+          "200": {
+            "description": "Service is running"
+          }
+        }
+      }
+    },
+    "/products": {
+      "get": {
+        "tags": ["Products"],
+        "summary": "Get all products",
+        "description": "Retrieve a list of all products with pagination",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "type": "integer",
+            "default": 1,
+            "description": "Page number"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "integer",
+            "default": 10,
+            "description": "Number of items per page"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "type": "string",
+            "description": "Search term for product title"
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "type": "string",
+            "description": "Filter by category ID"
+          },
+          {
+            "name": "minPrice",
+            "in": "query",
+            "type": "number",
+            "description": "Minimum price filter"
+          },
+          {
+            "name": "maxPrice",
+            "in": "query",
+            "type": "number",
+            "description": "Maximum price filter"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "type": "string",
+            "enum": ["price_asc", "price_desc", "newest", "popular"],
+            "description": "Sort order"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of products retrieved successfully"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Products"],
+        "summary": "Create a new product",
+        "description": "Create a new product with the provided details",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["title", "description", "slug", "tags", "warranty"],
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "example": "iPhone 15 Pro Max"
+                },
+                "description": {
+                  "type": "string",
+                  "example": "Latest Apple smartphone with A17 Pro chip"
+                },
+                "slug": {
+                  "type": "string",
+                  "example": "iphone-15-pro-max"
+                },
+                "brand": {
+                  "type": "string",
+                  "example": "Apple"
+                },
+                "tags": {
+                  "type": "string",
+                  "example": "apple, iphone, smartphone, mobile"
+                },
+                "warranty": {
+                  "type": "string",
+                  "example": "1 year"
+                },
+                "colors": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "example": ["#000000", "#FFFFFF", "#808080"]
+                },
+                "custom_specifications": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "example": "Battery Life"
+                      },
+                      "value": {
+                        "type": "string",
+                        "example": "29 hours"
+                      }
+                    }
+                  }
+                },
+                "custom_properties": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "property": {
+                        "type": "string",
+                        "example": "Storage"
+                      },
+                      "value": {
+                        "type": "string",
+                        "example": "256GB"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Product created successfully"
+          },
+          "400": {
+            "description": "Invalid input data"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/products/{id}": {
+      "get": {
+        "tags": ["Products"],
+        "summary": "Get product by ID",
+        "description": "Retrieve a single product by its ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "description": "Product ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Product retrieved successfully"
+          },
+          "404": {
+            "description": "Product not found"
+          }
+        }
+      },
+      "put": {
+        "tags": ["Products"],
+        "summary": "Update product",
+        "description": "Update an existing product",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "description": "Product ID"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "example": "iPhone 15 Pro Max Updated"
+                },
+                "description": {
+                  "type": "string",
+                  "example": "Updated description"
+                },
+                "slug": {
+                  "type": "string",
+                  "example": "iphone-15-pro-max-updated"
+                },
+                "brand": {
+                  "type": "string",
+                  "example": "Apple"
+                },
+                "tags": {
+                  "type": "string",
+                  "example": "apple, iphone, smartphone"
+                },
+                "warranty": {
+                  "type": "string",
+                  "example": "2 years"
+                },
+                "colors": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "custom_specifications": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "custom_properties": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "property": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Product updated successfully"
+          },
+          "404": {
+            "description": "Product not found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Products"],
+        "summary": "Delete product",
+        "description": "Delete a product by ID",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "description": "Product ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Product deleted successfully"
+          },
+          "404": {
+            "description": "Product not found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/products/slug/{slug}": {
+      "get": {
+        "tags": ["Products"],
+        "summary": "Get product by slug",
+        "description": "Retrieve a single product by its slug",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "description": "Product slug"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Product retrieved successfully"
+          },
+          "404": {
+            "description": "Product not found"
+          }
+        }
+      }
+    },
+    "/products/seller/{sellerId}": {
+      "get": {
+        "tags": ["Products"],
+        "summary": "Get products by seller",
+        "description": "Retrieve all products of a specific seller",
+        "parameters": [
+          {
+            "name": "sellerId",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "description": "Seller ID"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "type": "integer",
+            "default": 1
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "integer",
+            "default": 10
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Products retrieved successfully"
+          }
+        }
+      }
+    },
+    "/categories": {
+      "get": {
+        "tags": ["Categories"],
+        "summary": "Get all categories",
+        "description": "Retrieve a list of all product categories",
+        "responses": {
+          "200": {
+            "description": "Categories retrieved successfully"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Categories"],
+        "summary": "Create a new category",
+        "description": "Create a new product category",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["name", "slug"],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "example": "Electronics"
+                },
+                "slug": {
+                  "type": "string",
+                  "example": "electronics"
+                },
+                "description": {
+                  "type": "string",
+                  "example": "Electronic devices and gadgets"
+                },
+                "parentId": {
+                  "type": "string",
+                  "example": null
+                },
+                "image": {
+                  "type": "string",
+                  "example": "https://example.com/category-image.jpg"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Category created successfully"
+          },
+          "400": {
+            "description": "Invalid input data"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/categories/{id}": {
+      "get": {
+        "tags": ["Categories"],
+        "summary": "Get category by ID",
+        "description": "Retrieve a single category by its ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "description": "Category ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Category retrieved successfully"
+          },
+          "404": {
+            "description": "Category not found"
+          }
+        }
+      },
+      "put": {
+        "tags": ["Categories"],
+        "summary": "Update category",
+        "description": "Update an existing category",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "description": "Category ID"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "slug": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "parentId": {
+                  "type": "string"
+                },
+                "image": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Category updated successfully"
+          },
+          "404": {
+            "description": "Category not found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Categories"],
+        "summary": "Delete category",
+        "description": "Delete a category by ID",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "description": "Category ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Category deleted successfully"
+          },
+          "404": {
+            "description": "Category not found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    }
+  }
+}

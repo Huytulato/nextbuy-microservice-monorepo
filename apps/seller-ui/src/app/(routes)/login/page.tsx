@@ -14,6 +14,10 @@ type FormData = {
 };
 
 const Login = () => {
+    // Build API base with safe fallback for local dev
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+    const API = API_BASE.endsWith('/api') ? API_BASE : `${API_BASE}/api`;
+    
     const [passwordVisible, setPasswordVisible] = useState(false);
     const [serverError, setServerError] = useState<string | null>(null);
     const [rememberMe, setRememberMe] = useState(false); 
@@ -23,7 +27,7 @@ const Login = () => {
 
     const loginMutation = useMutation({
         mutationFn: async (data: FormData) => {
-            const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/login-user`, data, {withCredentials: true}); 
+            const response = await axios.post(`${API}/login-seller`, data, {withCredentials: true}); 
             return response.data;
         },
         onSuccess: (data) => {

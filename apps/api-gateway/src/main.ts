@@ -12,6 +12,7 @@ import swaggerUi from 'swagger-ui-express';
 import axios from 'axios';
 import cookieParser from 'cookie-parser';
 import { error } from 'console';
+import initializeSizeConfig from './libs/initiallizeSizeConfig';
 
 // start app is server Express
 const app = express();  
@@ -46,10 +47,49 @@ app.get('/gateway-health', (req, res) => {
   res.send({ message: 'Welcome to api-gateway!' });
 });
 
-app.use("/", proxy("http://localhost:6001"));
+app.use("/product", proxy("http://localhost:6002", {
+  proxyReqOptDecorator: function(proxyReqOpts, srcReq) {
+    // Forward cookies from original request
+    if (srcReq.headers.cookie) {
+      proxyReqOpts.headers = proxyReqOpts.headers || {};
+      proxyReqOpts.headers.cookie = srcReq.headers.cookie;
+    }
+    return proxyReqOpts;
+  },
+  userResDecorator: function(proxyRes, proxyResData, userReq, userRes) {
+    // Forward Set-Cookie headers from backend to client
+    if (proxyRes.headers['set-cookie']) {
+      userRes.setHeader('Set-Cookie', proxyRes.headers['set-cookie']);
+    }
+    return proxyResData;
+  }
+}));
+app.use("/", proxy("http://localhost:6001", {
+  proxyReqOptDecorator: function(proxyReqOpts, srcReq) {
+    // Forward cookies from original request
+    if (srcReq.headers.cookie) {
+      proxyReqOpts.headers = proxyReqOpts.headers || {};
+      proxyReqOpts.headers.cookie = srcReq.headers.cookie;
+    }
+    return proxyReqOpts;
+  },
+  userResDecorator: function(proxyRes, proxyResData, userReq, userRes) {
+    // Forward Set-Cookie headers from backend to client
+    if (proxyRes.headers['set-cookie']) {
+      userRes.setHeader('Set-Cookie', proxyRes.headers['set-cookie']);
+    }
+    return proxyResData;
+  }
+}));
+
 
 const port = process.env.PORT || 8080;
 const server = app.listen(port, () => {
   console.log(`Listening at http://localhost:${port}/api`);
+  try {
+    initializeSizeConfig();
+  } catch (error) {
+    console.error('Failed to initialize size configuration on server start:', error);
+  }
 });
 server.on('error', console.error);

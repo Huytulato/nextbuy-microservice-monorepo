@@ -1,11 +1,8 @@
 import axios from "axios";
 
-// 1. Lấy URI từ biến môi trường
 const SERVER_URI = process.env.NEXT_PUBLIC_SERVER_URI || "http://localhost:8080";
 
-// 2. Logic thông minh: Nếu URI chưa có đuôi '/api' thì tự cộng thêm vào
-// Kết quả sẽ luôn là: http://localhost:8080/api
-const BASE_URL = SERVER_URI.endsWith("/api") ? SERVER_URI : `${SERVER_URI}/api`;
+const BASE_URL = SERVER_URI;
 
 const axiosInstance = axios.create({
   baseURL: BASE_URL,

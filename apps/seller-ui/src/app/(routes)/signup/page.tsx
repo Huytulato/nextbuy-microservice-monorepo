@@ -1,12 +1,16 @@
 'use client'
 import React from 'react'
 import { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import axios from 'axios';
+import CreateShop from '../../../shared/modules/create-shop';
+import { countries } from '../../../utils/countries';
+import StripeLogo from 'apps/seller-ui/src/assets/svgs/stripe-logo';
+
+
 
 type FormData = {
     name: string;
@@ -16,11 +20,13 @@ type FormData = {
     country: string;
 };
 
-import { countries } from '../../../utils/countries';
-
 const Signup = () => {
+    // Build API base with safe fallback for local dev
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+    const API = API_BASE.endsWith('/api') ? API_BASE : `${API_BASE}/api`;
     // Steps: 1 = Create Account, 2 = Setup Shop, 3 = Connect Bank
     const [activeStep, setActiveStep] = useState(1);
+    const [sellerId, setSellerId] = useState<string>('');
     const [passwordVisible, setPasswordVisible] = useState(false);
     const [serverError, setServerError] = useState<string | null>(null);
     // OTP section should appear only after successful signup
@@ -32,7 +38,6 @@ const Signup = () => {
     const [otpError, setOtpError] = useState<string | null>(null);
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
-    const router = useRouter();  
 
     const {register, handleSubmit, formState: {errors}} = useForm<FormData>();
     
@@ -74,7 +79,7 @@ const Signup = () => {
                 phone_number: data.phone,
                 country: data.country,
             };
-            const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/seller-registration`, payload);
+            const response = await axios.post(`${API}/seller-registration`, payload);
             return response.data;
         },
         onSuccess: (_,formData) => {
@@ -92,7 +97,7 @@ const Signup = () => {
     const verifyOtpMutation = useMutation({
         mutationFn: async (otpCode: string) => {
             if (!sellerData) throw new Error('User data not found');
-            const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/verify-seller`, {
+            const response = await axios.post(`${API}/verify-seller`, {
                 email: sellerData.email,
                 otp: otpCode,
                 password: sellerData.password,
@@ -105,7 +110,7 @@ const Signup = () => {
         onSuccess: (resp) => {
             // After successful verification, stay in app and go to Step 2
             // Optionally, save sellerId for creating shop later
-            // const sellerId = resp?.data?.id;
+            setSellerId(resp?.data?.id || '');
             setShowOtp(false);
             setActiveStep(2);
         },
@@ -117,7 +122,7 @@ const Signup = () => {
     const resendOtpMutation = useMutation({
         mutationFn: async () => {
             if (!sellerData) throw new Error('User data not found');
-            const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/seller-registration`, {
+            const response = await axios.post(`${API}/seller-registration`, {
                 name: sellerData.name,
                 email: sellerData.email,
                 password: sellerData.password,
@@ -191,6 +196,18 @@ const Signup = () => {
         }
     }
 
+    const connectStripe = async () => {
+        try {
+            const response = await axios.post(`${API}/create-stripe-account`, 
+            {sellerId});
+            if (response.data.url){
+                window.location.href = response.data.url;
+            }
+        } catch (error) {
+            console.error('Error connecting to Stripe:', error);
+        }
+    }
+
 
         return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 py-12">
@@ -220,7 +237,7 @@ const Signup = () => {
                 })()}
             </div>
             {/* Steps content*/}
-                        <div className='w-full max-w-md p-8 bg-white shadow rounded-lg'>
+            <div className='w-full max-w-md p-8 bg-white shadow rounded-lg'>
                 {activeStep === 1 && (
                   <>
                     {/* Form */}
@@ -473,6 +490,23 @@ const Signup = () => {
                         </div>
                     )}
                   </>
+                )}
+                {activeStep === 2 && 
+                    <CreateShop sellerId={sellerId} setActiveStep={setActiveStep} />
+                }
+                {activeStep === 3 &&(
+                    <div className='text-center'>
+                        <h3 className='text-2xl font-semibold text-gray-800 mb-4'>
+                            Withdraw Method
+                        </h3>
+                        <br/>
+                        <button 
+                            onClick={connectStripe}
+                            className='w-full m-auto flex items-center justify-center gap-3 text-lg bg-red-600 text-white p-2 rounded-md hover:bg-red-700 transition'
+                        >
+                            Connect Stripe <StripeLogo />
+                        </button>
+                    </div>
                 )}
             </div>
     </div>
