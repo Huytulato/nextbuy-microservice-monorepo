@@ -47,40 +47,10 @@ app.get('/gateway-health', (req, res) => {
   res.send({ message: 'Welcome to api-gateway!' });
 });
 
-app.use("/product", proxy("http://localhost:6002", {
-  proxyReqOptDecorator: function(proxyReqOpts, srcReq) {
-    // Forward cookies from original request
-    if (srcReq.headers.cookie) {
-      proxyReqOpts.headers = proxyReqOpts.headers || {};
-      proxyReqOpts.headers.cookie = srcReq.headers.cookie;
-    }
-    return proxyReqOpts;
-  },
-  userResDecorator: function(proxyRes, proxyResData, userReq, userRes) {
-    // Forward Set-Cookie headers from backend to client
-    if (proxyRes.headers['set-cookie']) {
-      userRes.setHeader('Set-Cookie', proxyRes.headers['set-cookie']);
-    }
-    return proxyResData;
-  }
-}));
-app.use("/", proxy("http://localhost:6001", {
-  proxyReqOptDecorator: function(proxyReqOpts, srcReq) {
-    // Forward cookies from original request
-    if (srcReq.headers.cookie) {
-      proxyReqOpts.headers = proxyReqOpts.headers || {};
-      proxyReqOpts.headers.cookie = srcReq.headers.cookie;
-    }
-    return proxyReqOpts;
-  },
-  userResDecorator: function(proxyRes, proxyResData, userReq, userRes) {
-    // Forward Set-Cookie headers from backend to client
-    if (proxyRes.headers['set-cookie']) {
-      userRes.setHeader('Set-Cookie', proxyRes.headers['set-cookie']);
-    }
-    return proxyResData;
-  }
-}));
+app.use("/order", proxy("http://localhost:6004"));
+app.use("/seller", proxy("http://localhost:6003"));
+app.use("/product", proxy("http://localhost:6002"));
+app.use("/", proxy("http://localhost:6001"));
 
 
 const port = process.env.PORT || 8080;

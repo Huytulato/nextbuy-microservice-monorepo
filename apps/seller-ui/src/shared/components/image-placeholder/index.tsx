@@ -84,17 +84,21 @@ const ImagePlaceHolder = ({
           </button>
           
           {/* Nút Edit/AI (Đẩy sang trái một chút: right-12) */}
-          <button
-            disabled={pictureUploadingLoader}
-            type="button"
-            className='absolute top-2 right-12 p-2 rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg z-10 transition-colors'
-            onClick={() => {
-                setOpenImageModal?.(true)
-                setSelectedImage?.(images[index].file_url)
-            }}
-          >
-            <WandSparkles size={14} color="#fff" />
-          </button>
+          {images && images[index] && images[index]?.file_url && (
+            <button
+              disabled={pictureUploadingLoader}
+              type="button"
+              className='absolute top-2 right-12 p-2 rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg z-10 transition-colors'
+              onClick={() => {
+                if (images[index]?.file_url) {
+                  setOpenImageModal?.(true);
+                  setSelectedImage?.(images[index].file_url);
+                }
+              }}
+            >
+              <WandSparkles size={14} color="#fff" />
+            </button>
+          )}
         </>
       ) : (
         // Giao diện khi chưa có ảnh

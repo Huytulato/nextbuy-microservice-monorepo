@@ -6,50 +6,63 @@ const isAuthenticated = async (req:any, res:Response, next: NextFunction ) => {
   try {
     // Safely access cookies - check if req.cookies exists
     const cookies = req.cookies || {};
-    const token = 
-        cookies["seller-access-token"] || 
-        cookies["accessToken"] ||          
-        req.headers.authorization?.split(" ")[1];
+    const tokensToTry = [
+      cookies["accessToken"],          // user token (prefer first for User UI)
+      cookies["seller-access-token"],  // seller token
+      cookies["admin-access-token"],   // admin token
+      req.headers.authorization?.split(" ")[1], // bearer token
+    ].filter(Boolean) as string[];
+
+    console.log("Middleware Token check:", { 
+      cookies, 
+      tokenFound: tokensToTry.length > 0, 
+      hasCookies: !!req.cookies 
+    });
     
-    console.log("Middleware Token check:", { cookies, tokenFound: !!token, hasCookies: !!req.cookies });
-    
-    if (!token) {
+    if (tokensToTry.length === 0) {
       return res.status(401).json({ success: false, message: "Unauthorized: No token provided" });
     }
 
-    //verify token
-    let decoded:any;
-    try {
-      decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET as string) as {id: string, role: "user" | "seller"};
-    } catch (jwtError: any) {
-      // Log specific JWT errors for debugging
-      if (jwtError.name === 'TokenExpiredError') {
-        console.error("Token expired:", jwtError.expiredAt);
+    // Try each token until one verifies successfully
+    let decoded:any = null;
+    let lastJwtError:any = null;
+
+    for (const token of tokensToTry) {
+      try {
+        decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET as string) as {id: string, role: "user" | "seller" | "admin"};
+        if (decoded) break;
+      } catch (jwtError: any) {
+        lastJwtError = jwtError;
+        // Continue to next token if available (helps when stale seller token exists but user token is valid)
+        continue;
+      }
+    }
+
+    // If still not decoded after trying all tokens, respond with the last JWT error details
+    if(!decoded) {
+      if (lastJwtError?.name === 'TokenExpiredError') {
+        console.error("Token expired:", lastJwtError.expiredAt);
         return res.status(401).json({ 
           success: false, 
           message: "Unauthorized: Token expired",
           error: "TokenExpiredError",
-          expiredAt: jwtError.expiredAt
+          expiredAt: lastJwtError.expiredAt
         });
-      } else if (jwtError.name === 'JsonWebTokenError') {
-        console.error("Invalid token:", jwtError.message);
+      } else if (lastJwtError?.name === 'JsonWebTokenError') {
+        console.error("Invalid token:", lastJwtError.message);
         return res.status(401).json({ 
           success: false, 
           message: "Unauthorized: Invalid token",
           error: "JsonWebTokenError"
         });
-      } else {
-        console.error("JWT verification error:", jwtError);
-        return res.status(401).json({ 
-          success: false, 
-          message: "Unauthorized: Token verification failed",
-          error: jwtError.name || "UnknownError"
-        });
       }
-    }
 
-    if(!decoded) {
-      return res.status(401).json({ success: false, message: "Unauthorized: Invalid token" });
+      console.error("JWT verification error:", lastJwtError);
+      return res.status(401).json({ 
+        success: false, 
+        message: "Unauthorized: Token verification failed",
+        error: lastJwtError?.name || "UnknownError"
+      });
     }
 
     let account;
@@ -61,6 +74,10 @@ const isAuthenticated = async (req:any, res:Response, next: NextFunction ) => {
     } else if (decoded.role === "seller") {
       account = await prisma.sellers.findUnique({ where: { id: decoded.id }, include: { shops: true } });
       req.seller = account;
+    } else if (decoded.role === "admin") {
+      account = await prisma.admins.findUnique({ where: { id: decoded.id } });
+      req.admin = account;
+      req.user = account; // Also set as user for compatibility with getAdmin
     } 
 
     console.log("Account lookup result:", { 

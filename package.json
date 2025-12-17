@@ -15,10 +15,13 @@
   "private": true,
   "dependencies": {
     "@prisma/client": "^6.16.2",
+    "@stripe/react-stripe-js": "^5.4.1",
+    "@stripe/stripe-js": "^8.6.0",
     "@tanstack/react-query": "^5.90.8",
     "@tanstack/react-table": "^8.21.3",
     "axios": "^1.12.2",
     "bcryptjs": "^3.0.2",
+    "canvas-confetti": "^1.9.4",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",
@@ -30,6 +33,7 @@
     "ioredis": "^5.8.0",
     "jotai": "^2.15.2",
     "jsonwebtoken": "^9.0.2",
+    "kafkajs": "^2.2.4",
     "lucide-react": "^0.545.0",
     "morgan": "^1.10.1",
     "next": "^15.5.4",
@@ -44,7 +48,8 @@
     "stripe": "^20.0.0",
     "styled-components": "^6.1.19",
     "swagger-autogen": "^2.23.7",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "zustand": "^5.0.9"
   },
   "devDependencies": {
     "@nx/docker": "21.5.3",
@@ -64,6 +69,7 @@
     "@swc/core": "~1.5.7",
     "@swc/helpers": "~0.5.11",
     "@swc/jest": "~0.2.38",
+    "@types/canvas-confetti": "^1.9.0",
     "@types/cookie-parser": "^1.4.9",
     "@types/cors": "^2.8.19",
     "@types/ejs": "^3.1.5",
@@ -78,6 +84,7 @@
     "@types/react-dom": "19.0.0",
     "@types/swagger-ui-express": "^4.1.8",
     "autoprefixer": "10.4.13",
+    "baseline-browser-mapping": "^2.9.5",
     "esbuild": "^0.19.2",
     "jest": "^30.0.2",
     "jest-environment-node": "^30.0.2",

@@ -32,11 +32,13 @@ model users {
   name      String
   email     String @unique
   password  String?
-  following String[]
+  followingIDs String[] @db.ObjectId
+  following    shops[]  @relation(fields: [followingIDs], references: [id])
   avatar    images?
   createdAt DateTime @default(now())
   updateAt  DateTime @updatedAt
   reviews   shopReviews[]
+  addresses shipping_addresses[]
 }
 
 model shopReviews {
@@ -67,6 +69,8 @@ model shops {
   reviews     shopReviews[]
   sellerId    String @db.ObjectId @unique
   sellers     sellers @relation(fields: [sellerId], references: [id])
+  followerIDs String[] @db.ObjectId
+  followers   users[]  @relation(fields: [followerIDs], references: [id])
   createdAt   DateTime @default(now())
   updateAt    DateTime @updatedAt
   products    products[]
@@ -141,6 +145,58 @@ model products {
   updateAt            DateTime @updatedAt
   shopId               String   @db.ObjectId
   shops                shops    @relation(fields: [shopId], references: [id])
+}
+
+model userAnalytics {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @unique
+  lastVisited DateTime
+  actions     Json[]   // Array of {productId, shopId, action, timestamp}
+  country     String?
+  city        String?
+  device      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model productAnalytics {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  productId    String   @unique
+  shopId       String?  @db.ObjectId
+  views        Int      @default(0)
+  cartAdds     Int      @default(0)
+  cartRemoves  Int      @default(0)
+  wishListAdds Int      @default(0)
+  wishListRemoves Int   @default(0)
+  purchases    Int      @default(0)
+  lastViewedAt DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model admins {
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  email     String @unique
+  password  String
+  role      String?
+  createdAt DateTime @default(now())
+  updateAt  DateTime @updatedAt
+}
+
+model shipping_addresses {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String   @db.ObjectId
+  fullName   String
+  phone      String
+  address    String
+  city       String
+  province   String
+  postalCode String
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updateAt   DateTime @updatedAt
+  users      users    @relation(fields: [userId], references: [id])
 }
 
 

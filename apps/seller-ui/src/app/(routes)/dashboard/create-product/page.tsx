@@ -1,6 +1,6 @@
 'use client'
 import ImagePlaceHolder from 'apps/seller-ui/src/shared/components/image-placeholder';
-import { ChevronRight, Home, Save, Eye, Package, ImageIcon, Folder, ChevronDown, Divide, X, Image, Wand, DollarSign, Layers, Video } from 'lucide-react';
+import { ChevronRight, Home, Save, Package, ImageIcon, Folder, ChevronDown, X, Wand, DollarSign, Layers, Video } from 'lucide-react';
 import React, { useMemo, useState } from 'react'
 import { useForm, Controller } from 'react-hook-form';
 import Input from 'packages/components/input';
@@ -30,10 +30,13 @@ const DashboardPage = () => {
   const [isChanged, setIsChanged] = useState(true);
   const [activeEffect, setActiveEffect] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState('');
+  const [originalImageUrl, setOriginalImageUrl] = useState(''); // Store original URL before enhancement
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number>(-1); // Track which image is being enhanced
   const [processing, setProcessing] = useState(false);
   const [pictureUploadingLoader, setPictureUploadingLoader] = useState(false);
   const [images, setImages] = useState<(UploadedImage | null)[]>([null]);
   const [loading, setLoading] = useState(false);
+  const [enhancing, setEnhancing] = useState(false);
   const router = useRouter();
 
   const { data, isLoading: categoriesLoading } = useQuery({
@@ -67,7 +70,7 @@ const DashboardPage = () => {
   const regularPrice = watch('regular_price');
 
   const subcategories = useMemo(() => {
-    return selectedCategory ? subCategoriesData[selectedCategory] || [] : {};
+    return selectedCategory ? subCategoriesData[selectedCategory] || [] : [];
   }, [selectedCategory, subCategoriesData]);
 
 
@@ -101,8 +104,12 @@ const DashboardPage = () => {
     setPictureUploadingLoader(true);
 
     try {
-      const fileName = await convertFileToBase64(file);
-      const response = await axiosInstance.post('/product/api/upload-product-image', { fileName });     
+      const fileData = await convertFileToBase64(file);
+      const originalFileName = file.name || `image-${Date.now()}.jpg`;
+      const response = await axiosInstance.post('/product/api/upload-product-image', { 
+        fileData,
+        originalFileName 
+      });     
       const updatedImages = [...images];
       const uploadImage = {
         fileId: response.data.fileId,
@@ -116,7 +123,8 @@ const DashboardPage = () => {
       setImages(updatedImages);
       setValue('images', updatedImages);
     } catch (error) {
-      console.error('Error converting image to base64:', error);
+      console.error('Error uploading image:', error);
+      toast.error('Failed to upload image. Please try again.');
     } finally {
       setPictureUploadingLoader(false);
     }
@@ -127,13 +135,66 @@ const DashboardPage = () => {
     setProcessing(true);
     setActiveEffect(transformation);
     try {
-      const transformedUrl = `${selectedImage}/tr:${transformation}`;
+      // Apply ImageKit transformation
+      const transformedUrl = `${originalImageUrl || selectedImage}/tr:${transformation}`;
       setSelectedImage(transformedUrl);
+      toast.success('Enhancement applied! Click "Apply Enhancement" to save.');
     } catch (error) {
       console.error('Error applying transformation:', error);
+      toast.error('Failed to apply enhancement');
     } finally {
       setProcessing(false);
     }
+  };
+
+  const handleApplyEnhancement = async () => {
+    if (!selectedImage || selectedImageIndex === -1 || enhancing) return;
+    
+    setEnhancing(true);
+    try {
+      // Download the enhanced image
+      const response = await fetch(selectedImage);
+      const blob = await response.blob();
+      
+      // Convert blob to File
+      const file = new File([blob], `enhanced-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      
+      // Upload the enhanced image
+      const fileData = await convertFileToBase64(file);
+      const uploadResponse = await axiosInstance.post('/product/api/upload-product-image', {
+        fileData,
+        originalFileName: `enhanced-${Date.now()}.jpg`
+      });
+
+      // Update the image in the array
+      const updatedImages = [...images];
+      updatedImages[selectedImageIndex] = {
+        fileId: uploadResponse.data.fileId,
+        file_url: uploadResponse.data.file_url,
+      };
+      
+      setImages(updatedImages);
+      setValue('images', updatedImages);
+      
+      // Reset modal state
+      setOpenImageModal(false);
+      setSelectedImage('');
+      setOriginalImageUrl('');
+      setActiveEffect(null);
+      setSelectedImageIndex(-1);
+      
+      toast.success('Image enhanced and saved successfully!');
+    } catch (error) {
+      console.error('Error applying enhancement:', error);
+      toast.error('Failed to save enhanced image. Please try again.');
+    } finally {
+      setEnhancing(false);
+    }
+  };
+
+  const handleResetEnhancement = () => {
+    setSelectedImage(originalImageUrl);
+    setActiveEffect(null);
   };
 
   const handleSaveDraft = () => {
@@ -333,20 +394,28 @@ const DashboardPage = () => {
                     </div>
                     {/* Grid of smaller images */}
                     <div className="grid grid-cols-3 gap-3 content-start">
-                      {images.slice(1).map((_, index) => (
-                        <div key={index} className="rounded-lg overflow-hidden border border-gray-200 bg-gray-50 aspect-square">
-                          <ImagePlaceHolder
-                            setOpenImageModal={setOpenImageModal}
-                            size="765 x 850"
-                            images={images}
-                            small
-                            setSelectedImage={setSelectedImage}
-                            index={index + 1}
-                            onImageChange={handleImageChange}
-                            onRemove={handleRemoveImage}
-                          />
-                        </div>
-                      ))}
+                      {images.slice(1).map((_, index) => {
+                        const actualIndex = index + 1; // +1 because we sliced from index 1
+                        return (
+                          <div key={index} className="rounded-lg overflow-hidden border border-gray-200 bg-gray-50 aspect-square">
+                            <ImagePlaceHolder
+                              setOpenImageModal={setOpenImageModal}
+                              size="765 x 850"
+                              images={images}
+                              small
+                              pictureUploadingLoader={pictureUploadingLoader}
+                              setSelectedImage={(url) => {
+                                setSelectedImage(url);
+                                setOriginalImageUrl(url);
+                                setSelectedImageIndex(actualIndex);
+                              }}
+                              index={actualIndex}
+                              onImageChange={handleImageChange}
+                              onRemove={handleRemoveImage}
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -449,17 +518,23 @@ const DashboardPage = () => {
                   <label className="block font-semibold mb-2 text-gray-700 text-sm">Subcategory</label>
                   <div className="relative">
                     <Controller
-                      name="subcategory"
+                      name="subCategory"
                       control={control}
                       render={({ field }) => (
                         <select
                           {...field}
                           className="w-full border outline-none px-3 py-2.5 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500 bg-white appearance-none cursor-pointer text-gray-700 transition-all hover:border-violet-300 disabled:bg-gray-50 disabled:cursor-not-allowed"
-                          disabled={!selectedCategory || categoriesLoading}
+                          disabled={!selectedCategory || categoriesLoading || subcategories.length === 0}
                         >
-                          <option value="">{!selectedCategory ? 'Select category first' : 'Select subcategory'}</option>
-                          {selectedCategory && subcategories[selectedCategory]?.map((sub: any) => (
-                            <option key={sub.id} value={sub.id}>{sub.name}</option>
+                          <option value="">
+                            {!selectedCategory 
+                              ? 'Select category first' 
+                              : subcategories.length === 0 
+                                ? 'No subcategories available' 
+                                : 'Select subcategory'}
+                          </option>
+                          {subcategories?.map((sub: string, index: number) => (
+                            <option key={index} value={sub}>{sub}</option>
                           ))}
                         </select>
                       )}
@@ -473,9 +548,9 @@ const DashboardPage = () => {
                   <div className="p-3 bg-violet-50 rounded-lg border border-violet-100">
                     <p className="text-xs text-violet-700">
                       <span className="font-medium">Path: </span>
-                      {categories.find((c: any) => c.id === selectedCategory)?.name}
-                      {watch('subcategory') && subcategories[selectedCategory]?.find((s: any) => s.id === watch('subcategory')) && (
-                        <span> / {subcategories[selectedCategory]?.find((s: any) => s.id === watch('subcategory'))?.name}</span>
+                      {selectedCategory}
+                      {watch('subCategory') && (
+                        <span> / {watch('subCategory')}</span>
                       )}
                     </p>
                   </div>
@@ -528,7 +603,7 @@ const DashboardPage = () => {
                      <div className="pt-2 border-t border-gray-100">
                         <input
                           placeholder="e.g. 100"
-                          {...register('stock_quantity', {
+                          {...register('stock', {
                             valueAsNumber: true,
                             required: "Stock quantity is required",
                             min: { value: 1, message: "Quantity must be at least 1" },
@@ -542,7 +617,7 @@ const DashboardPage = () => {
                           className="w-full border outline-none px-3 py-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-700 transition-all hover:border-indigo-300"
                         />
                         <span className="text-xs text-gray-500 mt-1 block">Stock Quantity</span>
-                        {errors.stock_quantity && <p className="text-red-500 text-sm mt-1">{errors.stock_quantity.message as string}</p>}
+                        {errors.stock && <p className="text-red-500 text-sm mt-1">{errors.stock.message as string}</p>}
                      </div>
                   </div>
             </div>
@@ -631,43 +706,94 @@ const DashboardPage = () => {
           </div> {/* End Right Column */}
         </div> {/* End Main Flex Layout */}
 
-        {/* --- MODAL (Keep as is) --- */}
+        {/* --- MODAL Enhance Product Image --- */}
         {openImageModal && (
-          <div className='fixed top-0 left-0 w-full h-full flex items-center justify-center bg-white bg-opacity-95 z-50'>
-            <div className='bg-gray-800 p-6 rounded-lg w-[450px] text-black relative'>
-              <div className='flex justify-center items-center pb-3 mb-4'>
+          <div className='fixed top-0 left-0 w-full h-full flex items-center justify-center bg-black bg-opacity-75 z-50'>
+            <div className='bg-gray-800 p-6 rounded-lg w-[500px] max-w-[90vw] relative'>
+              <div className='flex justify-between items-center pb-3 mb-4 border-b border-gray-700'>
                 <h2 className='text-xl font-semibold text-white'>Enhance Product Image</h2>
-                <X size={20} className='absolute top-6 right-6 text-gray-400 hover:text-white cursor-pointer' onClick={() => setOpenImageModal(!openImageModal)} />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenImageModal(false);
+                    setSelectedImage('');
+                    setOriginalImageUrl('');
+                    setActiveEffect(null);
+                    setSelectedImageIndex(-1);
+                  }}
+                  className='text-gray-400 hover:text-white transition-colors'
+                >
+                  <X size={20} />
+                </button>
               </div>
-              <div className='relative w-full h-[250px] rounded-md bg-gray-900'>
-                <Image
-                  src={selectedImage}
-                  alt="product-image"
-                  layout="fill"
-                  objectFit="contain"
-                />
+              
+              {/* Image Preview */}
+              <div className='relative w-full h-[300px] rounded-md bg-gray-900 flex items-center justify-center overflow-hidden mb-4'>
+                {selectedImage ? (
+                  <img
+                    src={selectedImage}
+                    alt="product-image"
+                    className='max-w-full max-h-full object-contain'
+                  />
+                ) : (
+                  <div className='text-gray-500'>No image selected</div>
+                )}
+                {processing && (
+                  <div className='absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center'>
+                    <div className='text-white'>Processing...</div>
+                  </div>
+                )}
               </div>
+
+              {/* AI Enhancement Options */}
               {selectedImage && (
                 <div className='mt-4 flex flex-col'>
-                  <h3 className='text-white text-sm font-semibold mb-2'>
+                  <h3 className='text-white text-sm font-semibold mb-3'>
                     AI Enhancement Options
                   </h3>
-                  <div className='grid grid-cols-2 gap-3 max-h-[200px] overflow-y-auto pr-1'>
+                  <div className='grid grid-cols-2 gap-3 mb-4'>
                     {enhancements?.map(({ label, effect }) => (
                       <button
                         key={effect}
                         type="button"
-                        className={`p-2 rounded-md flex items-center gap-2 text-sm transition-colors ${activeEffect === effect
-                            ? "bg-blue-600 text-white"
+                        className={`p-3 rounded-md flex items-center justify-center gap-2 text-sm transition-all ${
+                          activeEffect === effect
+                            ? "bg-blue-600 text-white shadow-lg"
                             : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                          }`}
+                        } ${processing ? 'opacity-50 cursor-not-allowed' : ''}`}
                         onClick={() => applyTransformation(effect)}
-                        disabled={processing}
+                        disabled={processing || enhancing}
                       >
                         <Wand size={16} />
                         {label}
                       </button>
                     ))}
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className='flex gap-3 mt-2'>
+                    {activeEffect && (
+                      <button
+                        type="button"
+                        onClick={handleResetEnhancement}
+                        className='flex-1 px-4 py-2 bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 transition-colors text-sm font-medium'
+                        disabled={enhancing}
+                      >
+                        Reset
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleApplyEnhancement}
+                      disabled={!activeEffect || enhancing || selectedImageIndex === -1}
+                      className={`flex-1 px-4 py-2 rounded-md transition-colors text-sm font-medium ${
+                        activeEffect && !enhancing && selectedImageIndex !== -1
+                          ? 'bg-blue-600 text-white hover:bg-blue-700'
+                          : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                      }`}
+                    >
+                      {enhancing ? 'Applying...' : 'Apply Enhancement'}
+                    </button>
                   </div>
                 </div>
               )}

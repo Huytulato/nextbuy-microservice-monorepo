@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react';
-import GoogleButton from '../../../shared/components/google-button';
+import GoogleButton from '../../../shared/components/google-button/google-button';
 import { useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 
