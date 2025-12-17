@@ -1,5 +1,5 @@
 'use client'
-import { ChevronRight, Delete, Plus, Trash, X } from 'lucide-react'
+import { ChevronRight, Plus, Trash, X } from 'lucide-react'
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -8,7 +8,7 @@ import { toast } from 'react-hot-toast'
 import { useForm } from 'react-hook-form';
 import Input from 'packages/components/input'
 import { Controller } from 'react-hook-form'
-import { Axios, AxiosError } from 'axios'
+import { AxiosError } from 'axios'
 import DeleteDiscountCodeModal from 'apps/seller-ui/src/shared/components/modals/delete.discount-code'
 
 const page = () => {

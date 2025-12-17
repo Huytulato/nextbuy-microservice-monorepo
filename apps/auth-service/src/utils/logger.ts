@@ -1,3 +1,4 @@
+import { isKafkaEnabled } from "@packages/utils/kafka";
 import { connectProducer, producer } from "@packages/utils/kafka/producer";
 
 export interface LogData {
@@ -10,6 +11,7 @@ export interface LogData {
 
 export const sendLog = async (logData: LogData): Promise<void> => {
   try {
+    if (!isKafkaEnabled()) return;
     await connectProducer();
     
     const logMessage = {

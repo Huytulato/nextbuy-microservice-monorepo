@@ -1,5 +1,5 @@
 'use client'
-import styled, { css } from 'styled-components';
+import styled from 'styled-components';
 
 // 1. SidebarWrapper: Thêm border phải để tách biệt và màu nền trắng sáng hơn
 export const SidebarWrapper = styled.div`

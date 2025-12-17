@@ -39,6 +39,9 @@ const DashboardPage = () => {
   const [enhancing, setEnhancing] = useState(false);
   const router = useRouter();
 
+  // This setter will be used once we add draft/change tracking.
+  void setIsChanged;
+
   const { data, isLoading: categoriesLoading } = useQuery({
     queryKey: ['categories'],
     queryFn: async () => {

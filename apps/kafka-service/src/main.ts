@@ -1,4 +1,4 @@
-import {kafka} from '@packages/utils/kafka';
+import { kafka, isKafkaEnabled } from '@packages/utils/kafka';
 import { updateUserAnalytics } from './services/analytics.service';
 
 const consumer = kafka.consumer({ groupId: "user-events-group" });
@@ -31,6 +31,10 @@ setInterval(processQueue, 5000); // Process every 5 seconds
 
 // kafka consumer to listen to user events
 export const consumeKafkaMessages = async () => {
+  if (!isKafkaEnabled()) {
+    console.log("[kafka-service] Kafka is disabled. Set KAFKA_ENABLED=true to start consuming.");
+    return;
+  }
   // connect to kafka broker
   await consumer.connect();
   // subscribe to topic
@@ -46,5 +50,7 @@ export const consumeKafkaMessages = async () => {
   });
 };
 
-consumeKafkaMessages().catch(console.error);
+consumeKafkaMessages().catch((err) => {
+  console.error("[kafka-service] Kafka consumer failed:", err);
+});
     

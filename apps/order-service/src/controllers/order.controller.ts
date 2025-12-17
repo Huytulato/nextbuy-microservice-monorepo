@@ -1,15 +1,16 @@
-import { disconnectProducer } from '../../../../packages/utils/kafka/producer';
-import { shipping_addresses } from '.prisma/client/client';
-import { ValidationError } from '@packages/error-handler';
+import { ValidationError, NotFoundError } from '@packages/error-handler';
 import prisma from '@packages/libs/prisma';
 import redis from '@packages/libs/redis';
-import { error } from 'console';
 import { NextFunction, Response } from "express";
 import Stripe from "stripe";
 import { sendEmail } from '../utils/send-email';
 
+type DeliveryStatus = "ordered" | "packed" | "shipped" | "out_for_delivery" | "delivered";
+const DELIVERY_STATUSES: DeliveryStatus[] = ["ordered", "packed", "shipped", "out_for_delivery", "delivered"];
+const prismaAny = prisma as any;
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2022-11-15.acacia",
+  apiVersion: "2025-11-17.clover",
 });
 
 // create payment intent
@@ -51,13 +52,13 @@ export const createPaymentIntent = async (
     
       }
     );
-    res.status(200).json({ 
+    return res.status(200).json({ 
       success: true,
       clientSecret: paymentIntent.client_secret 
     });
   } catch (error: any) {
     console.error('Payment intent creation error:', error);
-    next(error);
+    return next(error);
   }
 };
 
@@ -159,7 +160,7 @@ export const createPaymentSession = async (
     });
   } 
   catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
@@ -197,7 +198,7 @@ export const verifyPaymentSession = async (
       return res.status(400).json({ error: "Payment session already completed" });
     }
 
-    res.status(200).json({ 
+    return res.status(200).json({ 
       success: true,
       session: {
         sessionId: session.sessionId,
@@ -211,7 +212,7 @@ export const verifyPaymentSession = async (
       }
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
@@ -290,7 +291,7 @@ export const createOrder = async (
         }
 
         // create order in database
-        await prisma.orders.create({
+        await prismaAny.orders.create({
           data: {
             userId,
             shopId,
@@ -317,7 +318,6 @@ export const createOrder = async (
             where: { id: productId },
             data: {
               stock: { decrement: quantity },
-              totalSold: { increment: quantity },
             },
           });
 
@@ -334,39 +334,6 @@ export const createOrder = async (
             },
           });
 
-          // Lưu ý: Logic tìm productAnalytics bằng userId có thể gây lỗi nếu model không hỗ trợ, 
-          // nhưng mình giữ nguyên theo logic code gốc của bạn.
-          const existingAnalytics = await prisma.productAnalytics.findUnique({
-            where: { userId }, // Kiểm tra lại schema xem field này có unique không
-          });
-
-          const newAction = {
-            productId,
-            shopId,
-            action: 'purchase',
-            timestamp: Date.now(),
-          };
-
-          const currentActions = Array.isArray(existingAnalytics?.actions) 
-            ? (existingAnalytics.actions as Prisma.JsonArray) 
-            : [];
-
-          if (existingAnalytics) {
-            await prisma.productAnalytics.update({
-              where: { userId },
-              data: {
-                actions: [...currentActions, newAction],
-              },
-            });
-          } else {
-            await prisma.productAnalytics.create({
-              data: {
-                userId,
-                // lastVisitedAt: new Date(), // Kiểm tra xem field này có trong schema không (productAnalytics thường không có userId làm khóa chính)
-                actions: [newAction],
-              },
-            });
-          }
         }
 
         // send email to user
@@ -399,7 +366,7 @@ export const createOrder = async (
           const firstProduct = shopGrouped[shop.id][0];
           const productTitle = firstProduct?.title || "new item";
 
-          await prisma.notifications.create({
+          await prismaAny.notifications.create({
             data: {
               title: "🛒 New Order Received",
               message: `A customer just ordered ${productTitle} from your shop.`,
@@ -412,7 +379,7 @@ export const createOrder = async (
 
         // Create notification for admin
         // SỬA: Đã thêm các dấu phẩy bị thiếu trong object bên dưới
-        await prisma.notifications.create({
+        await prismaAny.notifications.create({
           data: {
             title: "🛒 New Order Placed",
             message: `A new order has been placed by ${name}.`,
@@ -427,12 +394,186 @@ export const createOrder = async (
       await redis.del(sessionKey);
     }
 
-    res.status(200).json({ received: true });
+    return res.status(200).json({ received: true });
   } catch (error) {
     console.log(error);
+    return next(error);
+  }
+};
+
+// get seller orders
+export const getSellerOrders = async (
+  req: any,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const shop = await prisma.shops.findUnique({
+      where: {
+        sellerId: req.seller?.id,
+      },
+    });
+
+    // Fetch orders for the shop
+    const orders = await prismaAny.orders.findMany({
+      where: {
+        shopId: shop?.id,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatar: true,
+          }
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      orders,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// get order details
+export const getOrderDetails = async (
+  req: any,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const shop = await prisma.shops.findUnique({
+      where: { sellerId: req.seller?.id },
+      select: { id: true },
+    });
+
+    if (!shop?.id) {
+      return next(new NotFoundError("Shop not found"));
+    }
+
+    const orderId = req.params.orderId;
+    const order = await prismaAny.orders.findUnique({
+      where: {
+        id: orderId,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatar: true,
+          }
+        },
+        items: {
+          include: {
+            product: true,
+          }
+        },
+        shippingAddress: true,
+        coupon: true,
+        shop: {
+          select: {
+            id: true,
+            name: true,
+            avatar: true,
+          }
+        },
+      },
+    });
+
+    if (!order) {
+      return next(new NotFoundError("Order not found"));
+    }
+
+    if (order.shopId !== shop.id) {
+      return next(new NotFoundError("Order not found"));
+    }
+
+    res.status(200).json({
+      success: true,
+      order: {
+        ...order,
+        items: order.items?.map((item: any) => ({
+          ...item,
+          selectedOptions: item.selectedOptions ?? [],
+          product: item.product ?? null,
+        })),
+      },
+    });
+  } catch (error) {
     next(error);
   }
 };
 
+// update delivery status (seller only)
+export const updateDeliveryStatus = async (
+  req: any,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const shop = await prisma.shops.findUnique({
+      where: { sellerId: req.seller?.id },
+      select: { id: true },
+    });
 
+    if (!shop?.id) {
+      return next(new NotFoundError("Shop not found"));
+    }
 
+    const orderId = req.params.orderId;
+    const deliveryStatus = req.body?.deliveryStatus as DeliveryStatus | undefined;
+
+    if (!deliveryStatus || !DELIVERY_STATUSES.includes(deliveryStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid deliveryStatus",
+        allowed: DELIVERY_STATUSES,
+      });
+    }
+
+    const existing = await prismaAny.orders.findFirst({
+      where: { id: orderId, shopId: shop.id },
+      select: { id: true },
+    });
+
+    if (!existing?.id) {
+      return next(new NotFoundError("Order not found"));
+    }
+
+    const updated = await prismaAny.orders.update({
+      where: { id: orderId },
+      data: { deliveryStatus },
+      include: {
+        user: { select: { id: true, name: true, email: true, avatar: true } },
+        items: { include: { product: true } },
+        shippingAddress: true,
+        coupon: true,
+        shop: { select: { id: true, name: true, avatar: true } },
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      order: {
+        ...updated,
+        items: updated.items?.map((item: any) => ({
+          ...item,
+          selectedOptions: item.selectedOptions ?? [],
+          product: item.product ?? null,
+        })),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};

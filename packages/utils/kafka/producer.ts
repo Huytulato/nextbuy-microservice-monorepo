@@ -1,10 +1,15 @@
-import { kafka } from "./index";
+import { Partitioners } from "kafkajs";
+import { isKafkaEnabled, parseEnvBoolean, kafka } from "./index";
 
-const producer = kafka.producer();
+const producer = kafka.producer({
+  // KafkaJS v2 changed the default partitioner. Keep legacy behavior and avoid the warning spam.
+  createPartitioner: Partitioners.LegacyPartitioner,
+});
 
 let isConnected = false;
 
 export const connectProducer = async () => {
+  if (!isKafkaEnabled()) return;
   if (!isConnected) {
     await producer.connect();
     isConnected = true;
@@ -13,6 +18,7 @@ export const connectProducer = async () => {
 };
 
 export const disconnectProducer = async () => {
+  if (!isKafkaEnabled()) return;
   if (isConnected) {
     await producer.disconnect();
     isConnected = false;
@@ -36,6 +42,7 @@ export interface UserEvent {
 
 export const publishUserEvent = async (event: UserEvent) => {
   try {
+    if (!isKafkaEnabled()) return;
     await connectProducer();
     
     await producer.send({
@@ -52,7 +59,8 @@ export const publishUserEvent = async (event: UserEvent) => {
     console.log("Event published:", event.action, "for user:", event.userId);
   } catch (error) {
     console.error("Failed to publish event:", error);
-    throw error;
+    const strict = parseEnvBoolean(process.env.KAFKA_STRICT) ?? false;
+    if (strict) throw error;
   }
 };
 

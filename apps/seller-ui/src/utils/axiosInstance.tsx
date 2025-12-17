@@ -61,7 +61,7 @@ axiosInstance.interceptors.response.use(
     try {
       // Gọi refresh token
       // Lưu ý: BASE_URL đã chuẩn hóa có đuôi /api nên gọi trực tiếp /refresh-token
-      const refreshResponse = await axios.post(
+      await axios.post(
         `${BASE_URL}/api/refresh-token`, 
         {},
         { withCredentials: true }

@@ -2,7 +2,7 @@
 import useSeller from 'apps/seller-ui/src/hooks/useSeller';
 import useSidebar from 'apps/seller-ui/src/hooks/useSidebar'
 import { usePathname } from 'next/navigation';
-import React, { use, useEffect } from 'react'
+import React, { useEffect } from 'react'
 import Box from '../box';
 import {Sidebar} from './sidebar.styles'
 import Link from 'next/link';

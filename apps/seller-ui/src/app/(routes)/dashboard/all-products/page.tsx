@@ -7,7 +7,6 @@ import Image from 'next/image'
 import axiosInstance from 'apps/seller-ui/src/utils/axiosInstance'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query' 
 import DeleteConfirmationModal from 'apps/seller-ui/src/shared/components/modals/delete.confirmation.modal'
-import { toast } from 'react-hot-toast'
 
 
 
@@ -32,6 +31,10 @@ const ProductList = () => {
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>();
+
+  // Note: analytics UI is not implemented yet, but keep the state for future work.
+  void analyticsData;
+  void showAnalytics;
   const queryClient = useQueryClient();  
   const { data: products = [], isLoading} = useQuery({
       queryKey: ["shop-products"],

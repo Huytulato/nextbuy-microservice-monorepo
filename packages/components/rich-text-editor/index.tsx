@@ -1,8 +1,11 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
-import ReactQuill from "react-quill-new";
+import React, { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import 'react-quill-new/dist/quill.snow.css';
+
+// react-quill touches `document` during import in some environments, so disable SSR for it.
+const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false });
 
 interface RichTextEditorProps {
   value: string;
@@ -11,7 +14,6 @@ interface RichTextEditorProps {
 
 const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange }) => {
   const [editorValue, setEditorValue] = useState(value || "");
-  const quillRef = useRef<ReactQuill | null>(null);
 
   useEffect(() => {
     setEditorValue(value || "");
@@ -65,7 +67,6 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange }) => {
   return (
     <div className="w-full">
       <ReactQuill
-        ref={quillRef}
         value={editorValue}
         onChange={handleChange}
         modules={modules}

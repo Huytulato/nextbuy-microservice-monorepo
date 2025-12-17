@@ -29,6 +29,8 @@ const Signup = () => {
     const [sellerId, setSellerId] = useState<string>('');
     const [passwordVisible, setPasswordVisible] = useState(false);
     const [serverError, setServerError] = useState<string | null>(null);
+    // Server error banner is not wired into the UI yet.
+    void serverError;
     // OTP section should appear only after successful signup
     const [showOtp, setShowOtp] = useState(false);
     const [otp, setOtp] = useState(['','','','']);

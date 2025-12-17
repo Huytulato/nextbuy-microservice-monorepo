@@ -4,6 +4,11 @@
 
 ✨ Your new, shiny [Nx workspace](https://nx.dev) is almost ready ✨.
 
+## Environment variables (Kafka)
+
+- **Kafka is disabled by default in local dev** (unless you set `KAFKA_ENABLED=true`).
+- **Example env config**: see `docs/env.example` and copy the values you need into your own `.env`.
+
 [Learn more about this workspace setup and its capabilities](https://nx.dev/nx-api/node?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
 
 ## Finish your CI setup

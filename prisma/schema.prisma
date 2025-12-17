@@ -39,6 +39,7 @@ model users {
   updateAt  DateTime @updatedAt
   reviews   shopReviews[]
   addresses shipping_addresses[]
+  orders    orders[]
 }
 
 model shopReviews {
@@ -74,6 +75,7 @@ model shops {
   createdAt   DateTime @default(now())
   updateAt    DateTime @updatedAt
   products    products[]
+  orders      orders[]
 }
 
 model sellers {
@@ -88,6 +90,17 @@ model sellers {
   createdAt   DateTime @default(now())
   updateAt    DateTime @updatedAt
   shopId      String? @db.ObjectId @unique
+  verificationStatus VerificationStatus @default(UNVERIFIED)
+  documents          Json?
+  rejectionReason    String?
+  verifiedAt         DateTime?
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 model site_config {
@@ -105,12 +118,14 @@ model discount_codes {
   sellerId    String @db.ObjectId
   createdAt   DateTime @default(now())
   updateAt    DateTime @updatedAt
+  orders      orders[]
 }
 
 enum productStatus {
   active
   pending
   draft
+  rejected
 }
 
 model products {
@@ -140,11 +155,23 @@ model products {
   cashOnDelivery       String?
   discount_codes       String[] @db.ObjectId
   status               productStatus @default(active)
+  rejectionReason      String?
+  isAutoModerated      Boolean   @default(false)
+  moderationScore      Float?
   deletedAt            DateTime?
   createdAt           DateTime @default(now())
   updateAt            DateTime @updatedAt
   shopId               String   @db.ObjectId
   shops                shops    @relation(fields: [shopId], references: [id])
+  orderItems           order_items[]
+}
+
+model product_history {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  productId   String   @db.ObjectId
+  changedBy   String
+  changes     Json
+  createdAt   DateTime @default(now())
 }
 
 model userAnalytics {
@@ -197,6 +224,60 @@ model shipping_addresses {
   createdAt  DateTime @default(now())
   updateAt   DateTime @updatedAt
   users      users    @relation(fields: [userId], references: [id])
+  orders     orders[]
+}
+
+enum deliveryStatus {
+  ordered
+  packed
+  shipped
+  out_for_delivery
+  delivered
+}
+
+model orders {
+  id                String          @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String          @db.ObjectId
+  shopId            String          @db.ObjectId
+  total             Float
+  status            String
+  deliveryStatus    deliveryStatus  @default(ordered)
+  shippingAddressId String?         @db.ObjectId
+  couponCode        String?
+  discountAmount    Float           @default(0)
+  createdAt         DateTime        @default(now())
+  updateAt          DateTime        @updatedAt
+
+  user              users           @relation(fields: [userId], references: [id])
+  shop              shops           @relation(fields: [shopId], references: [id])
+  shippingAddress   shipping_addresses? @relation(fields: [shippingAddressId], references: [id])
+  coupon            discount_codes? @relation(fields: [couponCode], references: [discountCode])
+  items             order_items[]
+}
+
+model order_items {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  orderId        String   @db.ObjectId
+  productId      String   @db.ObjectId
+  quantity       Int
+  price          Float
+  selectedOptions Json?
+  createdAt      DateTime @default(now())
+  updateAt       DateTime @updatedAt
+
+  order          orders   @relation(fields: [orderId], references: [id])
+  product        products @relation(fields: [productId], references: [id])
+}
+
+model notifications {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  title         String
+  message       String
+  creatorId     String
+  receiverId    String
+  redirect_link String
+  createdAt     DateTime @default(now())
+  updateAt      DateTime @updatedAt
 }
 
 

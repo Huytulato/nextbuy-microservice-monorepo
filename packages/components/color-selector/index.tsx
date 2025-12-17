@@ -1,6 +1,6 @@
-import { Controller, set } from "react-hook-form"
+import { Controller } from "react-hook-form"
 import { useState } from "react"
-import { Divide, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 
 const defaultColors = [
   "#000000", // Black
@@ -34,7 +34,6 @@ const ColorSelector = ({ control, errors}: any) => {
         <div className="flex grap-3 flex-wrap">
           {[...defaultColors, ...customColors].map((color) => {
             const isSelected = (field.value || []) .includes(color);
-            const isLightColor = ['#FFFFFF', '#FFFF00', '#FFC0CB', '#F5F5DC'].includes(color);
 
             return <button key={color} type="button"
             onClick={() => field.onChange(isSelected 
