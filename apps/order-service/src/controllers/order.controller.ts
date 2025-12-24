@@ -4,6 +4,7 @@ import redis from '@packages/libs/redis';
 import { NextFunction, Response } from "express";
 import Stripe from "stripe";
 import { sendEmail } from '../utils/send-email';
+import { publishNotificationEvent } from '@packages/utils/kafka/producer';
 
 type DeliveryStatus = "ordered" | "packed" | "shipped" | "out_for_delivery" | "delivered";
 const DELIVERY_STATUSES: DeliveryStatus[] = ["ordered", "packed", "shipped", "out_for_delivery", "delivered"];
@@ -366,27 +367,23 @@ export const createOrder = async (
           const firstProduct = shopGrouped[shop.id][0];
           const productTitle = firstProduct?.title || "new item";
 
-          await prismaAny.notifications.create({
-            data: {
-              title: "🛒 New Order Received",
-              message: `A customer just ordered ${productTitle} from your shop.`,
-              creatorId: userId,
-              receiverId: shop.sellerId,
-              redirect_link: `https://nextbuy.com/order/${sessionId}`,
-            },
+          // Publish notification event for seller
+          await publishNotificationEvent({
+            title: "🛒 New Order Received",
+            message: `A customer just ordered ${productTitle} from your shop.`,
+            creatorId: userId,
+            receiverId: shop.sellerId,
+            redirect_link: `https://nextbuy.com/order/${sessionId}`,
           });
         }
 
-        // Create notification for admin
-        // SỬA: Đã thêm các dấu phẩy bị thiếu trong object bên dưới
-        await prismaAny.notifications.create({
-          data: {
-            title: "🛒 New Order Placed",
-            message: `A new order has been placed by ${name}.`,
-            creatorId: userId,
-            receiverId: 'admin',
-            redirect_link: `https://nextbuy.com/admin/orders/${sessionId}`
-          }
+        // Publish notification event for admin
+        await publishNotificationEvent({
+          title: "🛒 New Order Placed",
+          message: `A new order has been placed by ${name}.`,
+          creatorId: userId,
+          receiverId: 'admin',
+          redirect_link: `https://nextbuy.com/admin/orders/${sessionId}`
         });
       } // Kết thúc vòng lặp shop
 
@@ -425,7 +422,7 @@ export const getSellerOrders = async (
             id: true,
             name: true,
             email: true,
-            avatar: true,
+            images: true,
           }
         },
       },
@@ -470,7 +467,7 @@ export const getOrderDetails = async (
             id: true,
             name: true,
             email: true,
-            avatar: true,
+            images: true,
           }
         },
         items: {
@@ -484,7 +481,7 @@ export const getOrderDetails = async (
           select: {
             id: true,
             name: true,
-            avatar: true,
+            images: true,
           }
         },
       },
@@ -577,3 +574,157 @@ export const updateDeliveryStatus = async (
     next(error);
   }
 };
+
+// verify coupon
+export const verifyCoupon = async (
+  req: any,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const couponCode = req.body.couponCode;
+    const coupon = await prisma.discount_codes.findUnique({
+      where: { discountCode: couponCode },
+    });
+    if (!coupon) {
+      return res.status(400).json({ error: "Invalid coupon code" });
+    }
+    return res.status(200).json({ coupon });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// get user orders
+export const getUserOrders = async (
+  req: any,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const orders = await prismaAny.orders.findMany({
+      where: { userId: req.user?.id },
+      include: {
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                title: true,
+                images: true,
+              }
+            }
+          }
+        },
+        shippingAddress: true,
+        shop: {
+          select: {
+            id: true,
+            name: true,
+            images: true,
+          }
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+    return res.status(200).json({ 
+      success: true,
+      orders 
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// get user order details
+export const getUserOrderDetails = async (
+  req: any,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const orderId = req.params.orderId;
+    const order = await prismaAny.orders.findUnique({
+      where: {
+        id: orderId,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            images: true,
+          }
+        },
+        items: {
+          include: {
+            product: true,
+          }
+        },
+        shippingAddress: true,
+        coupon: true,
+        shop: {
+          select: {
+            id: true,
+            name: true,
+            images: true,
+          }
+        },
+      },
+    });
+
+    if (!order) {
+      return next(new NotFoundError("Order not found"));
+    }
+
+    // Verify the order belongs to the user
+    if (order.userId !== req.user?.id) {
+      return next(new NotFoundError("Order not found"));
+    }
+
+    res.status(200).json({
+      success: true,
+      order: {
+        ...order,
+        items: order.items?.map((item: any) => ({
+          ...item,
+          selectedOptions: item.selectedOptions ?? [],
+          product: item.product ?? null,
+        })),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+// get admin orders
+export const getAdminOrders = async (
+  req: any,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const orders = await prismaAny.orders.findMany(
+      {
+        include: {
+          user: true,
+          shop: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      }
+    );
+    return res.status(200).json({
+      success: true,
+      orders,
+    });
+  } catch (error) {
+    next(error);
+  }
+}

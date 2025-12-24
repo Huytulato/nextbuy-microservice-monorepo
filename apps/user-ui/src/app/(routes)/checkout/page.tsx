@@ -88,7 +88,12 @@ const CheckoutPage = () => {
           { withCredentials: true }
         );
 
-        setClientSecret(intentRes.data.clientSecret);
+        const clientSecretValue = intentRes.data.clientSecret;
+        console.log('Client secret received:', clientSecretValue ? 'Yes' : 'No');
+        if (!clientSecretValue) {
+          throw new Error("Client secret not received from server");
+        }
+        setClientSecret(clientSecretValue);
       } catch (err: any) {
         console.error("Checkout error:", err);
         

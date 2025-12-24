@@ -19,7 +19,7 @@ const app = express();
 
 // allow frontend to call this API
 app.use(cors({
-  origin: ["http://localhost:3000"],
+  origin: ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002" ],
   allowedHeaders: ['Authorization','Content-Type'],
   credentials: true,
 })
@@ -47,9 +47,12 @@ app.get('/gateway-health', (req, res) => {
   res.send({ message: 'Welcome to api-gateway!' });
 });
 
+
+app.use("/admin", proxy("http://localhost:6005"));
 app.use("/order", proxy("http://localhost:6004"));
 app.use("/seller", proxy("http://localhost:6003"));
 app.use("/product", proxy("http://localhost:6002"));
+app.use("/shop", proxy("http://localhost:6002")); // Shop routes are handled by product-service
 app.use("/", proxy("http://localhost:6001"));
 
 

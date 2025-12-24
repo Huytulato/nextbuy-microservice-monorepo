@@ -19,7 +19,7 @@ const page = () => {
   const { data: discountCodes = [], isLoading} = useQuery({
     queryKey: ['shop-discounts'],
     queryFn: async () => {
-      const res = await axiosInstance.get('/product/api/get-discount-codes');
+      const res = await axiosInstance.get('/seller/api/get-discount-codes');
       return res?.data?.discount_codes || [];
     },
   });
@@ -37,7 +37,7 @@ const page = () => {
   const createDiscountCodeMutation = useMutation(
     {
       mutationFn: async (data) => {
-        await axiosInstance.post('/product/api/create-discount-codes', data);
+        await axiosInstance.post('/seller/api/create-discount-codes', data);
       },
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['shop-discounts'] });
@@ -48,7 +48,7 @@ const page = () => {
 
   const deleteDiscountCodeMutation = useMutation({
     mutationFn: async (id: string) => {
-      await axiosInstance.delete(`/product/api/delete-discount-codes/${id}`);
+      await axiosInstance.delete(`/seller/api/delete-discount-codes/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shop-discounts'] });
@@ -71,7 +71,7 @@ const page = () => {
   return (
     <div className="w-full min-h-screen p-8">
       <div className="flex justify-between items-center mb-8">
-        <h2 className='text-2xl text-white font-semibold'>
+        <h2 className='text-2xl text-gray-900 font-semibold'>
           Discount Codes
         </h2>
         <button
@@ -88,7 +88,7 @@ const page = () => {
           Dashboard
         </Link>
         <ChevronRight size={20} className="inline mx-2 text-gray-500" />
-        <span className="text-gray-300">Discount Codes</span>
+        <span className="text-gray-700">Discount Codes</span>
       </div>
 
       <div className='mt-8 bg-white p-6 rounded-lg shadow-lg'>
@@ -100,7 +100,7 @@ const page = () => {
         ) : (
           <table className="w-full table-auto border-collapse">
             <thead>
-              <tr className="bg-white-800">
+              <tr className="bg-gray-50">
                 <th className='p-3 text-left'>Title</th>
                 <th className='p-3 text-left'>Type</th>
                 <th className='p-3 text-left'>Value</th>
@@ -110,7 +110,7 @@ const page = () => {
             </thead>
             <tbody>
               {discountCodes?.map((discount: any) => (
-                <tr key={discount.id} className="border-b border-gray-700">
+                <tr key={discount.id} className="border-b border-gray-200 hover:bg-gray-50">
                   <td className='p-3'>{discount.public_name}</td>
                   <td className='p-3'>{discount.discountType}</td>
                   <td className='p-3'>{discount.discountValue}</td>
@@ -128,7 +128,7 @@ const page = () => {
 
               {
                 !isLoading && discountCodes.length === 0 && (
-                  <p className='text-gray-400 p-3'>
+                  <p className='text-gray-600 p-3'>
                     No discount codes available.
                   </p>
                 )

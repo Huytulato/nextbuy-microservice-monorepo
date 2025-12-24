@@ -3,7 +3,9 @@ import { imagekit } from "@packages/libs/image-kit";
 import prisma from "@packages/libs/prisma";
 import { Prisma } from "@prisma/client";
 import { NextFunction, Request, Response } from "express";
-import { start } from "repl";
+import { checkProductModeration } from "../services/auto-moderation.service";
+import { detectSignificantChanges } from "../services/product-change-detector.service";
+import { publishNotificationEvent } from "@packages/utils/kafka/producer";
 
 // get product categories
 export const getCategories = async (req: Request, res: Response, next: NextFunction) => {
@@ -20,96 +22,11 @@ export const getCategories = async (req: Request, res: Response, next: NextFunct
 }
 
 
-//Create discount code
-export const createDiscountCodes = async (req: any, res: Response, next: NextFunction) => {
-  try {
-    const { public_name, discountType, discountValue, discountCode } = req.body;
-    const isDiscountCodeExist = await prisma.discount_codes.findUnique({
-      where: {
-        discountCode,
-      },
-    });
-    if (isDiscountCodeExist) {
-      return next(new ValidationError("Discount code already exists"));
-    }
-    const discount_code = await prisma.discount_codes.create({
-      data: {
-        public_name,
-        discountType,
-        discountValue: parseFloat(discountValue),
-        discountCode,
-        sellerId: req.seller.id,
-      },
-    });
-    return res.status(201).json({
-      success: true,
-      discount_code
-    });
-  } catch (error) {
-    return next(error);
-  }
-};
 
-// get discount codes
-export const getDiscountCodes = async (req: any, res: Response, next: NextFunction) => {
-  try {
-    console.log("getDiscountCodes - req.seller:", req.seller ? { id: req.seller.id } : null);
-    
-    if (!req.seller || !req.seller.id) {
-      console.error("getDiscountCodes - Seller not found in request");
-      return res.status(401).json({ 
-        success: false, 
-        message: "Unauthorized: Seller information missing" 
-      });
-    }
 
-    const discount_codes = await prisma.discount_codes.findMany({
-      where: {
-        sellerId: req.seller.id,
-      },
-    });
 
-    return res.status(200).json({
-      success: true,
-      discount_codes,
-    });
-  }
-  catch (error) {
-    console.error("getDiscountCodes error:", error);
-    return next(error);
-  }
-};
 
-// delete discount codes
-export const deleteDiscountCodes = async (req: any, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const sellerId = req.seller?.id;
-    const discount_codes = await prisma.discount_codes.findUnique({
-      where: {id},
-      select: {id: true, sellerId: true},
-    });
 
-    if(!discount_codes){
-      return next(new NotFoundError("Discount code not found"));
-    }
-
-    if (discount_codes.sellerId !== sellerId) {
-      return next(new ValidationError("You are not authorized to delete this discount code"));
-    }
-
-    await prisma.discount_codes.delete({
-      where: { id },
-    });
-
-    return res.status(200).json({
-      message: "Discount code deleted successfully",
-    });
-  }
-  catch (error) {
-    return next(error);
-  }
-};
 
 // upload product images
 export const uploadProductImages = async (req: Request, res: Response, next: NextFunction) => {
@@ -258,6 +175,33 @@ console.log("🧐 [DEBUG] Checking required fields:", {
     imagesCount: images.filter((img: any) => img && img.fileId && img.file_url).length
   });
 
+  // Run auto moderation check
+  const moderationResult = checkProductModeration({
+    title,
+    short_description,
+    detailed_description,
+    tags: processedTags,
+    category,
+    brand: brand || undefined,
+  });
+
+  // Determine product status based on moderation result
+  let productStatus: 'active' | 'pending' | 'rejected' = 'pending';
+  let rejectionReason: string | null = null;
+  let isAutoModerated = false;
+
+  if (moderationResult.shouldReject) {
+    productStatus = 'rejected';
+    rejectionReason = moderationResult.reasons.join(', ');
+    isAutoModerated = true;
+  } else if (moderationResult.shouldApprove) {
+    productStatus = 'active';
+    isAutoModerated = true;
+  } else {
+    // Needs manual review
+    productStatus = 'pending';
+  }
+
   const newProduct = await prisma.products.create({
     data: {
       title,
@@ -282,6 +226,11 @@ console.log("🧐 [DEBUG] Checking required fields:", {
       custom_properties: custom_properties || {},
       starting_date: starting_date ? new Date(starting_date) : new Date(),
       ending_date: ending_date ? new Date(ending_date) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      status: productStatus,
+      submittedAt: new Date(),
+      isAutoModerated,
+      moderationScore: moderationResult.moderationScore,
+      rejectionReason,
       images: {
         create: images
                 .filter((img: any) => img && img.fileId && img.file_url)
@@ -294,9 +243,43 @@ console.log("🧐 [DEBUG] Checking required fields:", {
     include: {images: true},
   });
 
+  // Create product history entry
+  await prisma.product_history.create({
+    data: {
+      productId: newProduct.id,
+      changedBy: req.seller.id,
+      changeType: isAutoModerated ? 'auto_moderation' : 'edit',
+      changes: {
+        action: 'created',
+        title,
+        category,
+        status: productStatus,
+        moderationScore: moderationResult.moderationScore,
+        autoModerated: isAutoModerated,
+      },
+      reason: rejectionReason,
+    },
+  });
+
+  // Publish notification event for admin if product needs manual review
+  if (productStatus === 'pending') {
+    await publishNotificationEvent({
+      title: "🔍 New Product Pending Review",
+      message: `Seller ${req.seller.name || req.seller.email} submitted a new product "${title}" for review.`,
+      creatorId: req.seller.id,
+      receiverId: 'admin',
+      redirect_link: `/dashboard/moderation/pending-products`,
+    });
+  }
+
   res.status(200).json({
     success: true,
     newProduct,
+    moderationResult: {
+      status: productStatus,
+      isAutoModerated,
+      moderationScore: moderationResult.moderationScore,
+    },
   });
   } catch (error: any) {
     console.error("❌ [ERROR] Create Product Failed:", {
@@ -309,12 +292,259 @@ console.log("🧐 [DEBUG] Checking required fields:", {
   }
 }
 
+// update product
+export const updateProduct = async (req: any, res: Response, next: NextFunction) => {
+  try {
+    const { productId } = req.params;
+    const {
+      title,
+      short_description,
+      detailed_description,
+      warranty,
+      custom_specifications,
+      slug,
+      tags,
+      cash_on_delivery,
+      brand,
+      video_url,
+      category,
+      colors = [],
+      sizes = [],
+      discount_codes = [],
+      stock,
+      sale_price,
+      regular_price,
+      subCategory,
+      custom_properties = {},
+      starting_date,
+      ending_date,
+      images = [],
+    } = req.body;
+
+    if (!req.seller.id) {
+      return next(new AuthError("Seller information is missing"));
+    }
+
+    const shopId = req.seller?.shops?.id;
+    if (!shopId) {
+      return next(new ValidationError("Seller must have a shop"));
+    }
+
+    // Get old product for change detection
+    const oldProduct = await prisma.products.findUnique({
+      where: { id: productId },
+      include: { images: true },
+    });
+
+    if (!oldProduct) {
+      return next(new NotFoundError("Product not found"));
+    }
+
+    // Verify product belongs to seller's shop
+    if (oldProduct.shopId !== shopId) {
+      return next(new ValidationError("You are not authorized to update this product"));
+    }
+
+    // Process tags
+    let processedTags: string[] = [];
+    if (Array.isArray(tags)) {
+      processedTags = tags.filter(tag => tag && tag.trim());
+    } else if (typeof tags === 'string' && tags.trim()) {
+      processedTags = tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+    }
+
+    // Process discount codes
+    const discountCodes: string[] = Array.isArray(discount_codes)
+      ? discount_codes
+      : discount_codes
+      ? [discount_codes]
+      : [];
+
+    const processedDiscountCodes = discountCodes.filter((code: any) => {
+      return code && typeof code === 'string' && /^[0-9a-fA-F]{24}$/.test(code);
+    });
+
+    // Detect significant changes if product is active
+    let requiresReReview = false;
+    let newStatus = oldProduct.status;
+
+    // If product was rejected, resubmitting should set it to pending for review
+    if (oldProduct.status === 'rejected') {
+      requiresReReview = true;
+      newStatus = 'pending';
+      
+      // Run auto moderation on updated product
+      const moderationResult = checkProductModeration({
+        title: title || oldProduct.title,
+        short_description: short_description || oldProduct.short_description,
+        detailed_description: detailed_description || oldProduct.detailed_description,
+        tags: processedTags,
+        category: category || oldProduct.category,
+        brand: brand || oldProduct.brand || undefined,
+      });
+
+      // If auto moderation rejects again, keep as rejected
+      if (moderationResult.shouldReject) {
+        newStatus = 'rejected';
+        requiresReReview = false;
+      } else if (moderationResult.shouldApprove) {
+        // If auto approves, set to active
+        requiresReReview = false;
+        newStatus = 'active';
+      }
+    }
+    // If product is active, check for significant changes
+    else if (oldProduct.status === 'active') {
+      const changeResult = detectSignificantChanges(
+        {
+          title: oldProduct.title,
+          short_description: oldProduct.short_description,
+          detailed_description: oldProduct.detailed_description || '',
+          category: oldProduct.category,
+          subCategory: oldProduct.subCategory || '',
+          sale_price: oldProduct.sale_price,
+          regular_price: oldProduct.regular_price,
+          images: oldProduct.images,
+          brand: oldProduct.brand || '',
+        },
+        {
+          title: title || oldProduct.title,
+          short_description: short_description || oldProduct.short_description,
+          detailed_description: detailed_description || oldProduct.detailed_description || '',
+          category: category || oldProduct.category,
+          subCategory: subCategory || oldProduct.subCategory || '',
+          sale_price: sale_price || oldProduct.sale_price,
+          regular_price: regular_price || oldProduct.regular_price,
+          images: images || oldProduct.images,
+          brand: brand || oldProduct.brand || '',
+        }
+      );
+
+      if (changeResult.hasSignificantChanges) {
+        requiresReReview = true;
+        newStatus = 'pending';
+
+        // Run auto moderation on updated product
+        const moderationResult = checkProductModeration({
+          title: title || oldProduct.title,
+          short_description: short_description || oldProduct.short_description,
+          detailed_description: detailed_description || oldProduct.detailed_description,
+          tags: processedTags,
+          category: category || oldProduct.category,
+          brand: brand || oldProduct.brand || undefined,
+        });
+
+        // If auto moderation rejects, set to rejected
+        if (moderationResult.shouldReject) {
+          newStatus = 'rejected';
+        } else if (moderationResult.shouldApprove) {
+          // If auto approves, keep as active (no re-review needed)
+          requiresReReview = false;
+          newStatus = 'active';
+        }
+      }
+    }
+
+    // Update product
+    const updatedProduct = await prisma.products.update({
+      where: { id: productId },
+      data: {
+        title: title || oldProduct.title,
+        short_description: short_description || oldProduct.short_description,
+        detailed_description: detailed_description !== undefined ? detailed_description : oldProduct.detailed_description,
+        warranty: warranty !== undefined ? warranty : oldProduct.warranty,
+        cashOnDelivery: cash_on_delivery !== undefined ? cash_on_delivery : oldProduct.cashOnDelivery,
+        slug: slug || oldProduct.slug,
+        tags: processedTags.length > 0 ? processedTags : oldProduct.tags,
+        brand: brand !== undefined ? brand : oldProduct.brand,
+        video_url: video_url !== undefined ? video_url : oldProduct.video_url,
+        category: category || oldProduct.category,
+        subCategory: subCategory !== undefined ? subCategory : oldProduct.subCategory,
+        colors: Array.isArray(colors) && colors.length > 0 ? colors : oldProduct.colors,
+        discount_codes: processedDiscountCodes.length > 0 ? processedDiscountCodes : oldProduct.discount_codes,
+        sizes: Array.isArray(sizes) && sizes.length > 0 ? sizes : oldProduct.sizes,
+        stock: stock !== undefined ? parseInt(stock.toString(), 10) : oldProduct.stock,
+        sale_price: sale_price !== undefined ? parseFloat(sale_price.toString()) : oldProduct.sale_price,
+        regular_price: regular_price !== undefined ? parseFloat(regular_price.toString()) : oldProduct.regular_price,
+        custom_specifications: custom_specifications || oldProduct.custom_specifications,
+        custom_properties: custom_properties || oldProduct.custom_properties,
+        starting_date: starting_date ? new Date(starting_date) : oldProduct.starting_date,
+        ending_date: ending_date ? new Date(ending_date) : oldProduct.ending_date,
+        status: newStatus,
+        requiresReReview,
+        submittedAt: requiresReReview ? new Date() : oldProduct.submittedAt,
+        // Update images if provided
+        ...(images && images.length > 0 && {
+          images: {
+            deleteMany: {},
+            create: images
+              .filter((img: any) => img && img.fileId && img.file_url)
+              .map((img: any) => ({
+                file_id: img.fileId,
+                url: img.file_url,
+              })),
+          },
+        }),
+      },
+      include: { images: true },
+    });
+
+    // Create product history entry
+    await prisma.product_history.create({
+      data: {
+        productId: updatedProduct.id,
+        changedBy: req.seller.id,
+        changeType: requiresReReview ? 'edit_requires_review' : 'edit',
+        changes: {
+          action: 'updated',
+          status: newStatus,
+          requiresReReview,
+        },
+      },
+    });
+
+    // Publish notification event for admin if product needs re-review or resubmitted
+    if (newStatus === 'pending' && (requiresReReview || oldProduct.status === 'rejected')) {
+      const actionText = oldProduct.status === 'rejected' 
+        ? 'resubmitted a previously rejected product' 
+        : 'updated a product that requires re-review';
+      
+      await publishNotificationEvent({
+        title: "🔄 Product Update Pending Review",
+        message: `Seller ${req.seller.name || req.seller.email} ${actionText}: "${updatedProduct.title}".`,
+        creatorId: req.seller.id,
+        receiverId: 'admin',
+        redirect_link: `/dashboard/moderation/pending-products`,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      product: updatedProduct,
+      requiresReReview,
+      message: requiresReReview
+        ? 'Product updated. Significant changes detected. Product requires re-review.'
+        : 'Product updated successfully',
+    });
+  } catch (error: any) {
+    console.error("❌ [ERROR] Update Product Failed:", {
+      message: error?.message,
+      code: error?.code,
+    });
+    return next(error);
+  }
+};
+
 // get logged in seller's products
 export const getShopProducts = async (req: any, res: Response, next: NextFunction) => {
   try {
+    if (!req.seller || !req.seller.id) {
+      return res.status(401).json({ success: false, message: "Unauthorized: Seller information missing" });
+    }
+
     const shopId = req.seller?.shops?.id;
     if (!shopId) {
-      return res.status(400).json({ success: false, message: "Seller must have a shop" });
+      return res.status(400).json({ success: false, message: "Seller must have a shop. Please create a shop first." });
     }
     
     const products = await prisma.products.findMany({
@@ -324,8 +554,12 @@ export const getShopProducts = async (req: any, res: Response, next: NextFunctio
       include: {
         images: true,
       },
+      orderBy: {
+        createdAt: 'desc'
+      }
     });
-    res.status(201).json({
+    
+    return res.status(200).json({
       success: true,
       products,
     });
@@ -406,56 +640,7 @@ export const restoreDeletedProduct = async (req: any, res: Response, next: NextF
   }
 }
 
-// get seller stripe information
-export const getSellerStripeAccount = async (req: any, res: Response, next: NextFunction) => {
-  try {
-    const sellerId = req.seller?.id;
-    
-    if (!sellerId) {
-      return res.status(401).json({
-        success: false,
-        message: "Seller not authenticated",
-      });
-    }
 
-    const seller = await prisma.sellers.findUnique({
-      where: { id: sellerId },
-      select: { 
-        id: true,
-        name: true,
-        email: true,
-        stripeId: true,
-        shops: {
-          select: {
-            id: true,
-            name: true,
-          }
-        }
-      },
-    });
-
-    if (!seller) {
-      return res.status(404).json({
-        success: false,
-        message: "Seller not found",
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      seller: {
-        id: seller.id,
-        name: seller.name,
-        email: seller.email,
-        stripeId: seller.stripeId,
-        hasStripeAccount: !!seller.stripeId,
-        shop: seller.shops,
-      },
-    });
-  } catch (error) {
-    return next(error);
-  }
-}
 
 // get All products 
 export const getAllProducts = async (req: Request, res: Response, next: NextFunction) => {
@@ -523,7 +708,7 @@ export const getAllProducts = async (req: Request, res: Response, next: NextFunc
               id: true,
               name: true,
               rating: true,
-              avatar: true,
+              images: true,
             },
           },
         },
@@ -641,7 +826,7 @@ export const getProductDetails = async (
             id: true,
             name: true,
             rating: true,
-            avatar: true,
+            images: true,
           },
         },
       },
@@ -887,7 +1072,7 @@ export const topShops = async (req: Request, res: Response, next: NextFunction) 
       select: {
         id: true,
         name: true,
-        avatar: true,
+        images: true,
         coverBanner: true,
         address: true,
         followers: true,
@@ -915,5 +1100,170 @@ export const topShops = async (req: Request, res: Response, next: NextFunction) 
     });
   } catch (error) {
     return next(error); 
+  }
+};
+
+// get shop by ID
+export const getShopById = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return next(new ValidationError("Shop ID is required"));
+    }
+
+    const shop = await prisma.shops.findUnique({
+      where: { id },
+      include: {
+        images: true,
+        followers: {
+          select: {
+            id: true,
+            name: true,
+            images: true,
+          }
+        },
+        reviews: {
+          include: {
+            users: {
+              select: {
+                id: true,
+                name: true,
+                images: true,
+              }
+            }
+          },
+          orderBy: {
+            createdAt: 'desc'
+          }
+        },
+        _count: {
+          select: {
+            products: true,
+            followers: true,
+            reviews: true,
+          }
+        }
+      }
+    });
+
+    if (!shop) {
+      return next(new NotFoundError("Shop not found"));
+    }
+
+    // Format the response
+    const formattedShop = {
+      id: shop.id,
+      name: shop.name,
+      bio: shop.bio,
+      category: shop.category,
+      images: shop.images,
+      coverBanner: shop.coverBanner,
+      address: shop.address,
+      opening_hours: shop.opening_hours,
+      website: shop.website,
+      social_links: shop.social_links,
+      rating: shop.rating,
+      createdAt: shop.createdAt,
+      followers: {
+        count: shop._count.followers,
+        users: shop.followers
+      },
+      products: {
+        count: shop._count.products
+      },
+      reviews: shop.reviews.map((review: any) => ({
+        id: review.id,
+        rating: review.rating,
+        review: review.reviews,
+        createdAt: review.createdAt,
+        user: review.users
+      }))
+    };
+
+    res.status(200).json({
+      success: true,
+      shop: formattedShop,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// get shop products (public endpoint)
+export const getPublicShopProducts = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { shopId } = req.params;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 12;
+    const skip = (page - 1) * limit;
+    const now = new Date();
+
+    if (!shopId) {
+      return next(new ValidationError("Shop ID is required"));
+    }
+
+    // Verify shop exists
+    const shop = await prisma.shops.findUnique({
+      where: { id: shopId },
+      select: { id: true }
+    });
+
+    if (!shop) {
+      return next(new NotFoundError("Shop not found"));
+    }
+
+    // Get active, non-deleted products for this shop
+    const [products, total] = await Promise.all([
+      prisma.products.findMany({
+        where: {
+          shopId,
+          isDeleted: false,
+          status: 'active',
+          starting_date: { lte: now },
+          ending_date: { gte: now },
+        },
+        include: {
+          images: true,
+          shops: {
+            select: {
+              id: true,
+              name: true,
+              rating: true,
+            }
+          }
+        },
+        skip,
+        take: limit,
+        orderBy: {
+          createdAt: 'desc'
+        }
+      }),
+      prisma.products.count({
+        where: {
+          shopId,
+          isDeleted: false,
+          status: 'active',
+          starting_date: { lte: now },
+          ending_date: { gte: now },
+        }
+      })
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    res.status(200).json({
+      success: true,
+      products,
+      pagination: {
+        total,
+        page,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      }
+    });
+  } catch (error) {
+    return next(error);
   }
 };

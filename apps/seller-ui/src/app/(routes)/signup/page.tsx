@@ -6,9 +6,12 @@ import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import axios from 'axios';
+import { useSearchParams } from 'next/navigation';
 import CreateShop from '../../../shared/modules/create-shop';
+import SubmitDocuments from '../../../shared/modules/submit-documents';
 import { countries } from '../../../utils/countries';
 import StripeLogo from 'apps/seller-ui/src/assets/svgs/stripe-logo';
+import useSeller from '../../../hooks/useSeller';
 
 
 
@@ -24,8 +27,18 @@ const Signup = () => {
     // Build API base with safe fallback for local dev
     const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
     const API = API_BASE.endsWith('/api') ? API_BASE : `${API_BASE}/api`;
-    // Steps: 1 = Create Account, 2 = Setup Shop, 3 = Connect Bank
-    const [activeStep, setActiveStep] = useState(1);
+    
+    // Get step from URL query parameter
+    const searchParams = useSearchParams();
+    const stepFromUrl = searchParams.get('step');
+    
+    // Get seller data if already logged in
+    const { seller, isLoading: sellerLoading } = useSeller();
+    
+    // Steps: 1 = Create Account, 2 = Submit Documents, 3 = Setup Shop, 4 = Connect Bank
+    // Initialize activeStep from URL if provided, otherwise default to 1
+    const initialStep = stepFromUrl ? parseInt(stepFromUrl, 10) : 1;
+    const [activeStep, setActiveStep] = useState(initialStep >= 1 && initialStep <= 4 ? initialStep : 1);
     const [sellerId, setSellerId] = useState<string>('');
     const [passwordVisible, setPasswordVisible] = useState(false);
     const [serverError, setServerError] = useState<string | null>(null);
@@ -42,6 +55,22 @@ const Signup = () => {
     const timerRef = useRef<NodeJS.Timeout | null>(null);
 
     const {register, handleSubmit, formState: {errors}} = useForm<FormData>();
+    
+    // Initialize sellerId and activeStep if seller is already logged in and step is provided
+    useEffect(() => {
+        if (!sellerLoading && seller && seller.id) {
+            // If seller is logged in, set sellerId
+            setSellerId(seller.id);
+            
+            // If step is provided in URL and seller is logged in, update activeStep
+            if (stepFromUrl) {
+                const step = parseInt(stepFromUrl, 10);
+                if (step >= 1 && step <= 4) {
+                    setActiveStep(step);
+                }
+            }
+        }
+    }, [seller, sellerLoading, stepFromUrl]);
     
     // Cleanup timer on unmount
     useEffect(() => {
@@ -110,8 +139,7 @@ const Signup = () => {
             return response.data;
         },
         onSuccess: (resp) => {
-            // After successful verification, stay in app and go to Step 2
-            // Optionally, save sellerId for creating shop later
+            // After successful verification, go to Step 2 (Submit Documents)
             setSellerId(resp?.data?.id || '');
             setShowOtp(false);
             setActiveStep(2);
@@ -200,7 +228,7 @@ const Signup = () => {
 
     const connectStripe = async () => {
         try {
-            const response = await axios.post(`${API}/create-stripe-account`, 
+            const response = await axios.post(`${API_BASE}/seller/api/create-stripe-account`, 
             {sellerId});
             if (response.data.url){
                 window.location.href = response.data.url;
@@ -218,8 +246,9 @@ const Signup = () => {
                 {(() => {
                     const steps = [
                         { number: 1, label: 'Create Account' },
-                        { number: 2, label: 'Setup Shop' },
-                        { number: 3, label: 'Connect Bank' },
+                        { number: 2, label: 'Submit Documents' },
+                        { number: 3, label: 'Setup Shop' },
+                        { number: 4, label: 'Connect Bank' },
                     ];
                     const progressPercent = ((activeStep - 1) / (steps.length - 1)) * 100;
                     return (
@@ -494,9 +523,20 @@ const Signup = () => {
                   </>
                 )}
                 {activeStep === 2 && 
+                    <SubmitDocuments 
+                        sellerId={sellerId} 
+                        onSuccess={() => {
+                            // After documents submitted, wait for approval
+                            // For now, allow proceeding to shop creation
+                            // In production, should check verification status
+                            setActiveStep(3);
+                        }}
+                    />
+                }
+                {activeStep === 3 && 
                     <CreateShop sellerId={sellerId} setActiveStep={setActiveStep} />
                 }
-                {activeStep === 3 &&(
+                {activeStep === 4 &&(
                     <div className='text-center'>
                         <h3 className='text-2xl font-semibold text-gray-800 mb-4'>
                             Withdraw Method

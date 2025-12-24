@@ -34,7 +34,7 @@ const CartPage = () => {
       .map((item: any) => ({
         id: item.id,
         quantity: item.quantity,
-        sale_price: item.sale_price,
+        sale_price: item.price || item.sale_price, // Map price to sale_price for consistency
         shopId: item.shopId,
         selectedOptions: item.selectedOptions || [],
       }))
@@ -56,10 +56,16 @@ const CartPage = () => {
 
     setLoading(true);
     try {
+      // Map cart items to ensure sale_price field exists (backend expects sale_price)
+      const cartWithSalePrice = cart.map((item: any) => ({
+        ...item,
+        sale_price: item.price || item.sale_price, // Map price to sale_price for backend
+      }));
+
       const res = await axiosInstance.post(
         "/order/api/create-payment-session",
         {
-          cart,
+          cart: cartWithSalePrice,
           selectedAddressId,
           coupon: {},
         }
@@ -224,6 +230,8 @@ const CartPage = () => {
               onAddressChange={setSelectedAddressId}
               selectedPaymentMethod={selectedPaymentMethod}
               onPaymentMethodChange={setSelectedPaymentMethod}
+              onCheckout={createPaymentSession}
+              loading={loading}
             />
           </div>
         </div>

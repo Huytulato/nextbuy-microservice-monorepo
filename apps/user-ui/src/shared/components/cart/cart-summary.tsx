@@ -11,6 +11,8 @@ interface CartSummaryProps {
   onAddressChange?: (addressId: string) => void;
   selectedPaymentMethod?: string;
   onPaymentMethodChange?: (method: string) => void;
+  onCheckout?: () => void;
+  loading?: boolean;
 }
 
 const CartSummary: React.FC<CartSummaryProps> = ({
@@ -18,6 +20,8 @@ const CartSummary: React.FC<CartSummaryProps> = ({
   onAddressChange,
   selectedPaymentMethod = "Online Payment",
   onPaymentMethodChange,
+  onCheckout,
+  loading = false,
 }) => {
   const cart = useStore((state: any) => state.cart)
   const [promoCode, setPromoCode] = useState('')
@@ -212,13 +216,14 @@ const CartSummary: React.FC<CartSummaryProps> = ({
       </div>
 
       {/* Checkout Button */}
-      <Link
-        href="/checkout"
-        className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors mb-3"
+      <button
+        onClick={onCheckout}
+        disabled={!selectedAddressId || loading}
+        className="w-full py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors mb-3"
       >
-        Proceed to Checkout
+        {loading ? 'Processing...' : 'Proceed to Checkout'}
         <ArrowRight className="w-5 h-5" />
-      </Link>
+      </button>
 
       <Link
         href="/products"

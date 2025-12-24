@@ -66,7 +66,7 @@ const ProductList = () => {
           cell: ({ row }: any) => {
             const imageUrl = row.original.images?.[0]?.url;
             return (
-              <div className="w-12 h-12 rounded-md overflow-hidden bg-white-700 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
                 {imageUrl ? (
                   <Image 
                     src={imageUrl} 
@@ -95,7 +95,7 @@ const ProductList = () => {
               <Link
                 href={`${process.env.NEXT_PUBLIC_USER_UI_LINK || ''}/product/${row.original.slug}`}
                 target="_blank"
-                className="text-blue-400 hover:text-blue-300 hover:underline transition-colors"
+                className="text-blue-600 hover:text-blue-700 hover:underline transition-colors"
                 title={row.original.title}
               >
                 {truncatedTitle}
@@ -107,7 +107,7 @@ const ProductList = () => {
           accessorKey: "price",
           header: "Price",
           cell: ({ row }: any) => (
-            <span className="text-white font-medium">
+            <span className="text-gray-900 font-medium">
               ${parseFloat(row.original.sale_price || 0).toFixed(2)}
             </span>
           ),
@@ -119,7 +119,7 @@ const ProductList = () => {
             const stock = row.original.stock || 0;
             const stockText = stock > 0 ? `${stock} left` : 'Out of stock';
             return (
-              <span className={`${stock > 0 ? 'text-green-400' : 'text-red-400'}`}>
+              <span className={`${stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {stockText}
               </span>
             );
@@ -129,10 +129,29 @@ const ProductList = () => {
           accessorKey: "category",
           header: "Category",
           cell: ({ row }: any) => (
-            <span className="text-gray-300 capitalize">
+            <span className="text-gray-700 capitalize">
               {row.original.category || 'N/A'}
             </span>
           ),
+        },
+        {
+          accessorKey: "status",
+          header: "Status",
+          cell: ({ row }: any) => {
+            const status = row.original.status || 'pending';
+            const statusConfig: Record<string, { label: string; className: string }> = {
+              active: { label: 'Active', className: 'bg-green-100 text-green-800' },
+              pending: { label: 'Pending', className: 'bg-yellow-100 text-yellow-800' },
+              rejected: { label: 'Rejected', className: 'bg-red-100 text-red-800' },
+              draft: { label: 'Draft', className: 'bg-gray-100 text-gray-800' },
+            };
+            const config = statusConfig[status] || statusConfig.pending;
+            return (
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.className}`}>
+                {config.label}
+              </span>
+            );
+          },
         },
         {
           accessorKey: "ratings",
@@ -142,7 +161,7 @@ const ProductList = () => {
             return (
               <div className="flex items-center gap-1">
                 <Star fill="#fbbf24" size={16} className="text-yellow-400" />
-                <span className="text-white font-medium">{rating.toFixed(1)}</span>
+                <span className="text-gray-900 font-medium">{rating.toFixed(1)}</span>
               </div>
             );
           },
@@ -150,43 +169,55 @@ const ProductList = () => {
         {
           id: "actions",
           header: "Actions",
-          cell: ({ row }: any) => (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  window.open(`${process.env.NEXT_PUBLIC_USER_UI_LINK || ''}/product/${row.original.slug}`, '_blank');
-                }}
-                className="p-1.5 rounded-md hover:bg-gray-700 transition-colors"
-                title="View Product"
-              >
-                <Eye size={16} className="text-blue-400" />
-              </button>
-              <Link
-                href={`/dashboard/create-product?edit=${row.original.id}`}
-                className="p-1.5 rounded-md hover:bg-gray-700 transition-colors"
-                title="Edit Product"
-              >
-                <Pencil size={16} className="text-yellow-400" />
-              </Link>
-              <button
-                onClick={() => {
-                  setAnalyticsData(row.original);
-                  setShowAnalytics(true);
-                }}
-                className="p-1.5 rounded-md hover:bg-gray-700 transition-colors"
-                title="View Analytics"
-              >
-                <BarChart3 size={16} className="text-green-400" />
-              </button>
-              <button
-                onClick={() => openDeleteModal(row.original)}
-                className="p-1.5 rounded-md hover:bg-gray-700 transition-colors"
-                title="Delete Product"
-              >
-                <Trash2 size={16} className="text-red-400" />
-              </button>
-            </div>
-          ),
+          cell: ({ row }: any) => {
+            const status = row.original.status || 'pending';
+            const rejectionReason = row.original.rejectionReason;
+            return (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    window.open(`${process.env.NEXT_PUBLIC_USER_UI_LINK || ''}/product/${row.original.slug}`, '_blank');
+                  }}
+                  className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                  title="View Product"
+                  disabled={status !== 'active'}
+                >
+                  <Eye size={16} className={status === 'active' ? "text-blue-400" : "text-gray-300"} />
+                </button>
+                <Link
+                  href={`/dashboard/create-product?edit=${row.original.id}`}
+                  className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                  title="Edit Product"
+                >
+                  <Pencil size={16} className="text-yellow-400" />
+                </Link>
+                <button
+                  onClick={() => {
+                    setAnalyticsData(row.original);
+                    setShowAnalytics(true);
+                  }}
+                  className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                  title="View Analytics"
+                >
+                  <BarChart3 size={16} className="text-green-400" />
+                </button>
+                <button
+                  onClick={() => openDeleteModal(row.original)}
+                  className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                  title="Delete Product"
+                >
+                  <Trash2 size={16} className="text-red-400" />
+                </button>
+                {status === 'rejected' && rejectionReason && (
+                  <div className="ml-2" title={rejectionReason}>
+                    <span className="text-xs text-red-600 cursor-help" title={rejectionReason}>
+                      Rejected
+                    </span>
+                  </div>
+                )}
+              </div>
+            );
+          },
         },
       ], []
   );
@@ -209,7 +240,7 @@ const ProductList = () => {
     <div className='w-full min-h-screen p-8'>
       {/* Header */}
       <div className="flex justify-between items-center mb-1">
-        <h2 className="text-2xl text-white font-semibold">All Products</h2>
+        <h2 className="text-2xl text-gray-900 font-semibold">All Products</h2>
         <Link
         href="/dashboard/create-product"
         className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
@@ -219,36 +250,36 @@ const ProductList = () => {
       </div>
       {/* Breadcrumbs */}
       <div className="flex items-center mb-6 text-sm">
-        <Link href={"/dashboard"} className="text-gray-400 hover:text-blue-400 transition-colors">
+        <Link href={"/dashboard"} className="text-gray-600 hover:text-blue-600 transition-colors">
           Dashboard
         </Link>
-        <ChevronRight size={16} className="text-gray-500 mx-1" />
-        <span className="text-gray-300">All Products</span>
+        <ChevronRight size={16} className="text-gray-400 mx-1" />
+        <span className="text-gray-700">All Products</span>
       </div>
       {/* Search Bar */}
-      <div className="mb-6 flex items-center bg-gray-800 border border-gray-700 p-3 rounded-lg">
-        <Search size={18} className="text-gray-400 mr-3" />
+      <div className="mb-6 flex items-center bg-white border border-gray-300 p-3 rounded-lg shadow-sm">
+        <Search size={18} className="text-gray-500 mr-3" />
         <input
           type="text"
           placeholder="Search products..."
-          className="w-full bg-transparent text-white placeholder-gray-500 outline-none"
+          className="w-full bg-transparent text-gray-900 placeholder-gray-400 outline-none"
           value={globalFilter}
           onChange={(e) => setGlobalFilter(e.target.value)}
         />
       </div>
 
       {/* Products Table */}
-      <div className="bg-gray-800 rounded-lg overflow-hidden border border-gray-700">
+      <div className="bg-white rounded-lg overflow-hidden border border-gray-200 shadow-sm">
         {isLoading ? (
-          <div className="p-8 text-center text-gray-400">
+          <div className="p-8 text-center text-gray-600">
             Loading products...
           </div>
         ) : products.length === 0 ? (
-          <div className="p-8 text-center text-gray-400">
+          <div className="p-8 text-center text-gray-600">
             <p className="mb-4">No products found</p>
             <Link
               href="/dashboard/create-product"
-              className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300"
+              className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700"
             >
               <Plus size={18} />
               Create your first product
@@ -257,13 +288,13 @@ const ProductList = () => {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-white-900 border-b border-gray-700">
+              <thead className="bg-gray-50 border-b border-gray-200">
                 {table.getHeaderGroups().map(headerGroup => (
                   <tr key={headerGroup.id}>
                     {headerGroup.headers.map(header => (
                       <th
                         key={header.id}
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider"
                       >
                         {header.isPlaceholder
                           ? null
@@ -276,11 +307,11 @@ const ProductList = () => {
                   </tr>
                 ))}
               </thead>
-              <tbody className="bg-gray-800 divide-y divide-gray-700">
+              <tbody className="bg-white divide-y divide-gray-200">
                 {table.getRowModel().rows.map(row => (
                   <tr
                     key={row.id}
-                    className="hover:bg-gray-700/50 transition-colors"
+                    className="hover:bg-gray-50 transition-colors"
                   >
                     {row.getVisibleCells().map(cell => (
                       <td

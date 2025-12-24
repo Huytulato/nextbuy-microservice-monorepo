@@ -1,7 +1,7 @@
 'use client'
 import ImagePlaceHolder from 'apps/seller-ui/src/shared/components/image-placeholder';
 import { ChevronRight, Home, Save, Package, ImageIcon, Folder, ChevronDown, X, Wand, DollarSign, Layers, Video } from 'lucide-react';
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import { useForm, Controller } from 'react-hook-form';
 import Input from 'packages/components/input';
 import ColorSelector from 'packages/components/color-selector';
@@ -13,7 +13,7 @@ import axios from 'axios';
 import RichTextEditor from 'packages/components/rich-text-editor';
 import SizeSelector from 'packages/components/size-selector';
 import { enhancements } from 'apps/seller-ui/src/utils/AI.enhancements';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 
 
@@ -23,8 +23,11 @@ interface UploadedImage {
 }
 
 const DashboardPage = () => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const editProductId = searchParams.get('edit');
 
-  const { register, handleSubmit, formState: { errors }, watch, setValue, control } = useForm();
+  const { register, handleSubmit, formState: { errors }, watch, setValue, control, reset } = useForm();
 
   const [openImageModal, setOpenImageModal] = useState(false);
   const [isChanged, setIsChanged] = useState(true);
@@ -37,10 +40,57 @@ const DashboardPage = () => {
   const [images, setImages] = useState<(UploadedImage | null)[]>([null]);
   const [loading, setLoading] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
-  const router = useRouter();
 
   // This setter will be used once we add draft/change tracking.
   void setIsChanged;
+
+  // Fetch product data if editing
+  const { data: productData, isLoading: productLoading } = useQuery({
+    queryKey: ['product-edit', editProductId],
+    queryFn: async () => {
+      if (!editProductId) return null;
+      const res = await axiosInstance.get(`/product/api/get-shop-products`);
+      const product = res?.data?.products?.find((p: any) => p.id === editProductId);
+      return product || null;
+    },
+    enabled: !!editProductId,
+  });
+
+  // Populate form when editing
+  useEffect(() => {
+    if (productData && editProductId) {
+      // Populate all form fields
+      reset({
+        title: productData.title || '',
+        slug: productData.slug || '',
+        brand: productData.brand || '',
+        tags: productData.tags?.join(', ') || '',
+        warranty: productData.warranty || '',
+        short_description: productData.short_description || '',
+        detailed_description: productData.detailed_description || '',
+        regular_price: productData.regular_price || '',
+        sale_price: productData.sale_price || '',
+        stock: productData.stock || '',
+        video_url: productData.video_url || '',
+        category: productData.category || '',
+        subCategory: productData.subCategory || '',
+        color: productData.colors || [],
+        sizes: productData.sizes || [],
+        custom_specifications: productData.custom_specifications || [],
+        custom_properties: productData.custom_properties || {},
+        discount_codes: productData.discount_codes || [],
+      });
+
+      // Populate images
+      if (productData.images && productData.images.length > 0) {
+        const formattedImages = productData.images.map((img: any) => ({
+          fileId: img.file_id,
+          file_url: img.url,
+        }));
+        setImages(formattedImages);
+      }
+    }
+  }, [productData, editProductId, reset]);
 
   const { data, isLoading: categoriesLoading } = useQuery({
     queryKey: ['categories'],
@@ -62,7 +112,7 @@ const DashboardPage = () => {
   const { data: discountCodes = [], isLoading: discountCodesLoading } = useQuery({
     queryKey: ['shop-discounts'],
     queryFn: async () => {
-      const res = await axiosInstance.get('/product/api/get-discount-codes');
+      const res = await axiosInstance.get('/seller/api/get-discount-codes');
       return res?.data?.discount_codes || [];
     },
   });
@@ -80,10 +130,18 @@ const DashboardPage = () => {
   const onSubmit = async (data: any) => {
     try {
       setLoading(true);
-      await axiosInstance.post('/product/api/create-product', data);
+      if (editProductId) {
+        // Update existing product
+        await axiosInstance.put(`/product/api/update-product/${editProductId}`, data);
+        toast.success('Product updated successfully!');
+      } else {
+        // Create new product
+        await axiosInstance.post('/product/api/create-product', data);
+        toast.success('Product created successfully!');
+      }
       router.push('/dashboard/all-products');
     } catch (error: any) {
-      toast.error(error?.data?.message);
+      toast.error(error?.response?.data?.message || error?.message || 'Something went wrong');
     } finally {
       setLoading(false);
     }
@@ -226,6 +284,37 @@ const DashboardPage = () => {
     }
   };
 
+  // Show loading state while fetching product data
+  if (editProductId && productLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading product data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if product not found
+  if (editProductId && !productLoading && !productData) {
+    return (
+      <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
+        <div className="text-center">
+          <Package className="mx-auto text-gray-400 mb-4" size={64} />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Product Not Found</h2>
+          <p className="text-gray-600 mb-4">The product you're trying to edit doesn't exist.</p>
+          <button
+            onClick={() => router.push('/dashboard/all-products')}
+            className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+          >
+            Back to Products
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50/50">
       <form
@@ -247,9 +336,13 @@ const DashboardPage = () => {
                 <div className="p-2 bg-indigo-100 rounded-lg">
                   <Package className="text-indigo-600" size={28} />
                 </div>
-                Create New Product
+                {editProductId ? 'Edit Product' : 'Create New Product'}
               </h1>
-              <p className="mt-2 text-gray-500">Fill in the details below to add a new product to your store</p>
+              <p className="mt-2 text-gray-500">
+                {editProductId 
+                  ? 'Update the details below to modify your product' 
+                  : 'Fill in the details below to add a new product to your store'}
+              </p>
             </div>
           </div>
         </div>
@@ -458,15 +551,17 @@ const DashboardPage = () => {
 
              {/* 1. Action Buttons (Sticky Top of Sidebar) */}
              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 sticky top-6 z-10">
-                 <h3 className="font-semibold text-gray-800 mb-4">Publish</h3>
+                 <h3 className="font-semibold text-gray-800 mb-4">
+                   {editProductId ? 'Update' : 'Publish'}
+                 </h3>
                  <div className="flex flex-col gap-3">
                     <button
                       type="submit"
-                      disabled={loading}
+                      disabled={loading || productLoading}
                       className="w-full flex justify-center items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg transition-all font-medium shadow-lg shadow-indigo-200 disabled:opacity-50"
                     >
                       <Save size={18} />
-                      {loading ? 'Saving...' : 'Save & Publish'}
+                      {loading ? 'Saving...' : editProductId ? 'Update Product' : 'Save & Publish'}
                     </button>
                     {isChanged && (
                       <button
@@ -711,10 +806,10 @@ const DashboardPage = () => {
 
         {/* --- MODAL Enhance Product Image --- */}
         {openImageModal && (
-          <div className='fixed top-0 left-0 w-full h-full flex items-center justify-center bg-black bg-opacity-75 z-50'>
-            <div className='bg-gray-800 p-6 rounded-lg w-[500px] max-w-[90vw] relative'>
-              <div className='flex justify-between items-center pb-3 mb-4 border-b border-gray-700'>
-                <h2 className='text-xl font-semibold text-white'>Enhance Product Image</h2>
+          <div className='fixed top-0 left-0 w-full h-full flex items-center justify-center bg-black bg-opacity-50 z-50'>
+            <div className='bg-white p-6 rounded-lg w-[500px] max-w-[90vw] relative shadow-xl'>
+              <div className='flex justify-between items-center pb-3 mb-4 border-b border-gray-200'>
+                <h2 className='text-xl font-semibold text-gray-900'>Enhance Product Image</h2>
                 <button
                   type="button"
                   onClick={() => {
@@ -724,14 +819,14 @@ const DashboardPage = () => {
                     setActiveEffect(null);
                     setSelectedImageIndex(-1);
                   }}
-                  className='text-gray-400 hover:text-white transition-colors'
+                  className='text-gray-500 hover:text-gray-700 transition-colors'
                 >
                   <X size={20} />
                 </button>
               </div>
               
               {/* Image Preview */}
-              <div className='relative w-full h-[300px] rounded-md bg-gray-900 flex items-center justify-center overflow-hidden mb-4'>
+              <div className='relative w-full h-[300px] rounded-md bg-gray-100 flex items-center justify-center overflow-hidden mb-4 border border-gray-200'>
                 {selectedImage ? (
                   <img
                     src={selectedImage}
@@ -742,8 +837,8 @@ const DashboardPage = () => {
                   <div className='text-gray-500'>No image selected</div>
                 )}
                 {processing && (
-                  <div className='absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center'>
-                    <div className='text-white'>Processing...</div>
+                  <div className='absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center'>
+                    <div className='text-gray-900 font-medium'>Processing...</div>
                   </div>
                 )}
               </div>
@@ -751,7 +846,7 @@ const DashboardPage = () => {
               {/* AI Enhancement Options */}
               {selectedImage && (
                 <div className='mt-4 flex flex-col'>
-                  <h3 className='text-white text-sm font-semibold mb-3'>
+                  <h3 className='text-gray-900 text-sm font-semibold mb-3'>
                     AI Enhancement Options
                   </h3>
                   <div className='grid grid-cols-2 gap-3 mb-4'>
@@ -762,7 +857,7 @@ const DashboardPage = () => {
                         className={`p-3 rounded-md flex items-center justify-center gap-2 text-sm transition-all ${
                           activeEffect === effect
                             ? "bg-blue-600 text-white shadow-lg"
-                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300"
                         } ${processing ? 'opacity-50 cursor-not-allowed' : ''}`}
                         onClick={() => applyTransformation(effect)}
                         disabled={processing || enhancing}
@@ -779,7 +874,7 @@ const DashboardPage = () => {
                       <button
                         type="button"
                         onClick={handleResetEnhancement}
-                        className='flex-1 px-4 py-2 bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 transition-colors text-sm font-medium'
+                        className='flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors text-sm font-medium border border-gray-300'
                         disabled={enhancing}
                       >
                         Reset
@@ -792,7 +887,7 @@ const DashboardPage = () => {
                       className={`flex-1 px-4 py-2 rounded-md transition-colors text-sm font-medium ${
                         activeEffect && !enhancing && selectedImageIndex !== -1
                           ? 'bg-blue-600 text-white hover:bg-blue-700'
-                          : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                          : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                       }`}
                     >
                       {enhancing ? 'Applying...' : 'Apply Enhancement'}

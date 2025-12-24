@@ -19,8 +19,8 @@ model images {
   id        String @id @default(auto()) @map("_id") @db.ObjectId
   file_id   String
   url       String
-  userId    String? @db.ObjectId @unique
-  shopId    String? @db.ObjectId @unique
+  userId    String? @db.ObjectId
+  shopId    String? @db.ObjectId
   users     users? @relation(fields: [userId], references: [id])  
   shops     shops? @relation(fields: [shopId], references: [id])
   products  products? @relation(fields: [productsId], references: [id])
@@ -34,7 +34,7 @@ model users {
   password  String?
   followingIDs String[] @db.ObjectId
   following    shops[]  @relation(fields: [followingIDs], references: [id])
-  avatar    images?
+  images  images[]
   createdAt DateTime @default(now())
   updateAt  DateTime @updatedAt
   reviews   shopReviews[]
@@ -60,7 +60,7 @@ model shops {
   name        String
   bio         String?
   category    String
-  avatar      images?
+  images  images[]
   coverBanner String?
   address     String
   opening_hours String
@@ -89,11 +89,17 @@ model sellers {
   shops       shops?
   createdAt   DateTime @default(now())
   updateAt    DateTime @updatedAt
-  shopId      String? @db.ObjectId @unique
   verificationStatus VerificationStatus @default(UNVERIFIED)
   documents          Json?
   rejectionReason    String?
   verifiedAt         DateTime?
+  submittedAt        DateTime?
+  reviewedBy         String? @db.ObjectId
+  reviewedAt         DateTime?
+  adminNotes         String?
+  resubmissionCount  Int @default(0)
+  reviewer           admins? @relation("AdminReviewedSellers", fields: [reviewedBy], references: [id])
+  verificationHistory seller_verification_history[]
 }
 
 enum VerificationStatus {
@@ -101,6 +107,19 @@ enum VerificationStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+model seller_verification_history {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  sellerId      String   @db.ObjectId
+  status        VerificationStatus
+  reviewedBy    String? @db.ObjectId
+  notes         String?
+  documents     Json?
+  createdAt     DateTime @default(now())
+  
+  seller        sellers @relation(fields: [sellerId], references: [id])
+  reviewer      admins? @relation("AdminSellerVerificationHistory", fields: [reviewedBy], references: [id])
 }
 
 model site_config {
@@ -154,24 +173,35 @@ model products {
   isDeleted            Boolean  @default(false)
   cashOnDelivery       String?
   discount_codes       String[] @db.ObjectId
-  status               productStatus @default(active)
+  status               productStatus @default(pending)
   rejectionReason      String?
   isAutoModerated      Boolean   @default(false)
   moderationScore      Float?
   deletedAt            DateTime?
+  submittedAt          DateTime?
+  reviewedBy           String? @db.ObjectId
+  reviewedAt           DateTime?
+  lastReviewedAt       DateTime?
+  requiresReReview     Boolean @default(false)
+  adminNotes           String?
   createdAt           DateTime @default(now())
   updateAt            DateTime @updatedAt
   shopId               String   @db.ObjectId
   shops                shops    @relation(fields: [shopId], references: [id])
+  reviewer             admins? @relation("AdminReviewedProducts", fields: [reviewedBy], references: [id])
   orderItems           order_items[]
+  history              product_history[]
 }
 
 model product_history {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   productId   String   @db.ObjectId
   changedBy   String
+  changeType  String   // "edit", "moderation_approve", "moderation_reject", "auto_moderation"
   changes     Json
+  reason      String?
   createdAt   DateTime @default(now())
+  product     products @relation(fields: [productId], references: [id])
 }
 
 model userAnalytics {
@@ -209,6 +239,9 @@ model admins {
   role      String?
   createdAt DateTime @default(now())
   updateAt  DateTime @updatedAt
+  reviewedSellers   sellers[] @relation("AdminReviewedSellers")
+  reviewedProducts  products[] @relation("AdminReviewedProducts")
+  sellerVerificationHistory seller_verification_history[] @relation("AdminSellerVerificationHistory")
 }
 
 model shipping_addresses {
@@ -276,6 +309,7 @@ model notifications {
   creatorId     String
   receiverId    String
   redirect_link String
+  isRead        Boolean  @default(false)
   createdAt     DateTime @default(now())
   updateAt      DateTime @updatedAt
 }

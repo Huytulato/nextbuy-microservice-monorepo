@@ -55,3 +55,5 @@ const PaymentSuccessPage = () => {
         </div>
     );
 };
+
+export default PaymentSuccessPage;

@@ -1,21 +1,26 @@
-/**
- * This is not a production server yet!
- * This is only a minimal backend to get started.
- */
-
 import express from 'express';
-import * as path from 'path';
+import cookieParser from 'cookie-parser';
+import cors from 'cors';
+import { errorMiddleware } from '@packages/error-handler';
+import router from './routes/seller.route';
 
 const app = express();
 
-app.use('/assets', express.static(path.join(__dirname, 'assets')));
+app.use(cors({
+  origin: ["http://localhost:3000"],
+  allowedHeaders: ['Authorization','Content-Type'],
+  credentials: true,
+}));
 
-app.get('/api', (req, res) => {
-  res.send({ message: 'Welcome to seller-service!' });
-});
+app.use(express.json());
+app.use(cookieParser());
 
-const port = process.env.PORT || 3333;
+app.use("/api", router);
+
+app.use(errorMiddleware);
+
+const port = process.env.PORT || 6003;
 const server = app.listen(port, () => {
-  console.log(`Listening at http://localhost:${port}/api`);
+  console.log(`Seller service is running at http://localhost:${port}/api`);
 });
 server.on('error', console.error);

@@ -33,7 +33,7 @@ const CreateShop = ({
         website: data.shopWebsite || '',
         sellerId,
       };
-      const response = await axios.post(`${API}/create-shop`, payload);
+      const response = await axios.post(`${API_BASE}/seller/api/create-shop`, payload);
       return response.data;
     },
     onSuccess: () => {

@@ -6,11 +6,7 @@ import bcrypt from "bcryptjs"; // library for hashing passwords
 import jwt from "jsonwebtoken"; // library for generating JSON Web Tokens
 import { setCookie } from "../utils/cookies/setCookie"; 
 import { sendLog } from "../utils/logger";
-import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-11-17.clover' as any,                 
-});
 
 // Register a new user
 export const userRegistration = async (req:Request,res:Response,next:NextFunction) => {
@@ -312,84 +308,11 @@ export const verifySeller = async (req:Request,res:Response,next:NextFunction) =
   }
 };
 
-// create a new shop for seller
-export const createSellerShop = async (req:any,res:Response,next:NextFunction) => {
-  try {
-    const { name, bio, category, address, opening_hours, website, sellerId} = req.body;
-    if (!name || !bio || !category || !address || !opening_hours || !sellerId) {
-      return next(new ValidationError('Name, bio, category, address, and opening hours are required'));
-    }
 
-    const shopData = {
-      name,
-      bio,
-      category,
-      address,
-      opening_hours,
-      website,
-      sellerId,
-    };
 
-    if (website && website.trim() !== '') {
-      shopData.website = website;
-    }
 
-    const shop = await prisma.shops.create({
-      data: shopData
-    });
 
-    res.status(201).json({
-      success: true,
-      data: shop,
-      message: "Shop created successfully",
-    });
-  } catch (error) {
-    next(error);
-  }
-};
 
-// create stripe connect account link
-export const createStripeConnectLink = async (req:any,res:Response,next:NextFunction) => {
-  try {
-    const { sellerId } = req.body;
-    if (!sellerId) {
-      return next(new ValidationError('Seller ID is required'));
-    }
-    const seller = await prisma.sellers.findUnique({
-      where: { id: sellerId }
-    });
-    if (!seller) {
-      return next(new ValidationError('Seller not found'));
-    }
-    const account = await stripe.accounts.create({
-      type: 'express',
-      email: seller.email!,
-      country: 'GB',
-      capabilities: {
-        card_payments: { requested: true },
-        transfers: { requested: true },
-      },
-    });
-
-    await prisma.sellers.update({
-      where: { id: sellerId },
-      data: { stripeId: account.id }
-    });
-
-    const accountLink = await stripe.accountLinks.create({
-      account: account.id,
-      refresh_url: `http://localhost:3000/success`,
-      return_url: `http://localhost:3000/success`,
-      type: 'account_onboarding',
-    });
-
-    res.json({
-      url: accountLink.url
-    })
-  } catch (error) {
-    next(error);
-  }
-};
 
 // login seller
 export const loginSeller = async (req:Request,res:Response,next:NextFunction) => {
@@ -445,6 +368,48 @@ export const getSeller = async (req:any,res:Response,next:NextFunction) => {
     });
   } catch (error) {
     next(error);
+  }
+};
+
+// Register admin (no OTP required)
+export const registerAdmin = async (req:Request,res:Response,next:NextFunction) => {
+  try {
+    const { name, email, password, role } = req.body;
+    
+    // Validate required fields
+    if (!name || !email || !password) {
+      return next(new ValidationError('Name, email, and password are required'));
+    }
+
+    // Check if admin already exists
+    const existingAdmin = await prisma.admins.findUnique({
+      where: { email }
+    });
+
+    if (existingAdmin) {
+      return next(new ValidationError('Email already exists'));
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create admin
+    const admin = await prisma.admins.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+        role: role || 'admin'
+      }
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Admin registered successfully",
+      admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role }
+    });
+  } catch (error) {
+    return next(error);
   }
 };
 
@@ -681,6 +646,71 @@ export const deleteUserAddress = async (req:any,res:Response,next:NextFunction) 
     res.status(200).json({
       success: true,
       message: "Address deleted successfully",
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// Get notifications for authenticated user/seller/admin
+export const getNotifications = async (req: any, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user?.id || req.seller?.id || req.admin?.id;
+    const role = req.user ? 'user' : req.seller ? 'seller' : 'admin';
+
+    if (!userId) {
+      return next(new AuthError('User not authenticated'));
+    }
+
+    const notifications = await prisma.notifications.findMany({
+      where: { 
+        receiverId: role === 'admin' ? 'admin' : userId 
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      notifications,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// Mark notification as read
+export const markNotificationAsRead = async (req: any, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user?.id || req.seller?.id || req.admin?.id;
+    const { notificationId } = req.params;
+
+    if (!userId) {
+      return next(new AuthError('User not authenticated'));
+    }
+
+    const notification = await prisma.notifications.findUnique({
+      where: { id: notificationId }
+    });
+
+    if (!notification) {
+      return next(new ValidationError('Notification not found'));
+    }
+
+    // Check if user owns this notification
+    if (notification.receiverId !== userId && notification.receiverId !== 'admin') {
+      return next(new AuthError('Unauthorized'));
+    }
+
+    await prisma.notifications.update({
+      where: { id: notificationId },
+      data: { isRead: true }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Notification marked as read",
     });
   } catch (error) {
     return next(error);
