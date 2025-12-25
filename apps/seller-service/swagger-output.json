@@ -1,0 +1,236 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Seller Service API",
+    "description": "API documentation for Seller Service - Seller management and operations",
+    "version": "1.0.0"
+  },
+  "host": "localhost:6003",
+  "basePath": "/",
+  "tags": [
+    {
+      "name": "Seller",
+      "description": "Seller management endpoints"
+    }
+  ],
+  "schemes": [
+    "http"
+  ],
+  "paths": {
+    "/create-shop": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "example": "any"
+                },
+                "bio": {
+                  "example": "any"
+                },
+                "category": {
+                  "example": "any"
+                },
+                "address": {
+                  "example": "any"
+                },
+                "opening_hours": {
+                  "example": "any"
+                },
+                "website": {
+                  "example": "any"
+                },
+                "sellerId": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        }
+      }
+    },
+    "/submit-seller-documents": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "documents": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/create-stripe-account": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "sellerId": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/create-discount-codes": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "public_name": {
+                  "example": "any"
+                },
+                "discountType": {
+                  "example": "any"
+                },
+                "discountValue": {
+                  "example": "any"
+                },
+                "discountCode": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        }
+      }
+    },
+    "/get-discount-codes": {
+      "get": {
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/delete-discount-codes/{id}": {
+      "delete": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/get-stripe-account": {
+      "get": {
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/{create-shop{where{id}}": {
+      "delete": {
+        "description": "",
+        "responses": {
+          "default": {
+            "description": ""
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "Seller": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "example": "seller_id"
+        },
+        "userId": {
+          "type": "string",
+          "example": "user_id"
+        },
+        "businessName": {
+          "type": "string",
+          "example": "Business Name"
+        },
+        "email": {
+          "type": "string",
+          "example": "seller@example.com"
+        },
+        "phone": {
+          "type": "string",
+          "example": "+1234567890"
+        },
+        "address": {
+          "type": "string",
+          "example": "Business Address"
+        },
+        "status": {
+          "type": "string",
+          "example": "active"
+        }
+      }
+    }
+  }
+}

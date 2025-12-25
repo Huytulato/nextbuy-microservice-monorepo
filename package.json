@@ -11,7 +11,8 @@
     "product-docs": "node apps/product-service/src/swagger.js",
     "user-ui": "npx nx run-many --target=dev --all --projects=user-ui",
     "seller-ui": "npx nx run-many --target=dev --all --projects=seller-ui",
-    "admin-ui": "npx nx run-many --target=dev --all --projects=admin-ui"
+    "admin-ui": "npx nx run-many --target=dev --all --projects=admin-ui",
+    "stripe:listen": "stripe listen --forward-to http://localhost:6004/order/api/create-order"
   },
   "private": true,
   "dependencies": {

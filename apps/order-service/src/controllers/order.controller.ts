@@ -152,7 +152,7 @@ export const createPaymentSession = async (
       createdAt: new Date(),
     };
 
-    await redis.set(`payment_session:${userId}:${sessionId}`, JSON.stringify(sessionData), 'EX', 15 * 60); // Expires in 15 minutes
+    await redis.set(`payment_session:${userId}:${sessionId}`, JSON.stringify(sessionData), 'EX', 30 * 60); // Expires in 30 minutes
     
     return res.status(200).json({ 
       success: true,
@@ -243,19 +243,41 @@ export const createOrder = async (
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
+    // Log all webhook events for debugging
+    console.log('✅ Webhook received:', {
+      type: event.type,
+      timestamp: new Date().toISOString(),
+      eventId: event.id
+    });
+
     if (event.type === 'payment_intent.succeeded') {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
       const sessionId = paymentIntent.metadata.sessionId;
       const userId = paymentIntent.metadata.userId;
 
+      console.log('💳 Payment Intent Succeeded:', {
+        sessionId,
+        userId,
+        amount: paymentIntent.amount,
+        currency: paymentIntent.currency,
+        paymentIntentId: paymentIntent.id
+      });
+
       // Use correct Redis key pattern with userId
       const sessionKey = `payment_session:${userId}:${sessionId}`;
+      console.log('🔍 Retrieving session from Redis:', sessionKey);
       const sessionData = await redis.get(sessionKey);
 
       if (!sessionData) {
-        console.warn('Payment session not found or expired for sessionId:', sessionId);
+        console.error('❌ Payment session not found or expired:', {
+          sessionKey,
+          sessionId,
+          userId
+        });
         return res.status(404).send('Payment session not found or expired');
       }
+
+      console.log('✅ Session retrieved successfully');
 
       const parsedSession = JSON.parse(sessionData);
       const { cart, totalAmount, shipping_addressesId, coupon } = parsedSession;
@@ -265,7 +287,7 @@ export const createOrder = async (
 
       // Update session status to 'completed'
       parsedSession.status = 'completed';
-      await redis.set(sessionKey, JSON.stringify(parsedSession), 'EX', 15 * 60);
+      await redis.set(sessionKey, JSON.stringify(parsedSession), 'EX', 30 * 60); // 30 minutes timeout
 
       const shopGrouped = cart.reduce((groups: any, item: any) => {
         if (!groups[item.shopId]) groups[item.shopId] = [];
@@ -275,6 +297,7 @@ export const createOrder = async (
 
       // SỬA: Dùng Object.keys để lặp qua các key của object shopGrouped
       for (const shopId of Object.keys(shopGrouped)) {
+        console.log('🛒 Processing shop orders:', shopId);
         const orderItems = shopGrouped[shopId];
         let orderTotal = orderItems.reduce((total: number, item: any) => {
           return total + item.sale_price * item.quantity;
@@ -290,6 +313,28 @@ export const createOrder = async (
             orderTotal -= discount * discountedItem.quantity;
           }
         }
+
+        // 🔒 IDEMPOTENCY CHECK: Prevent duplicate order creation from webhook retries
+        const existingOrder = await prismaAny.orders.findFirst({
+          where: { 
+            userId, 
+            shopId,
+            status: 'paid',
+            total: orderTotal,
+            createdAt: { gte: new Date(Date.now() - 5 * 60 * 1000) } // Within last 5 minutes
+          }
+        });
+
+        if (existingOrder) {
+          console.log('⚠️ Order already exists, skipping duplicate creation:', {
+            orderId: existingOrder.id,
+            shopId,
+            userId
+          });
+          continue; // Skip to next shop
+        }
+
+        console.log('✅ Creating new order for shop:', shopId);
 
         // create order in database
         await prismaAny.orders.create({
@@ -388,12 +433,62 @@ export const createOrder = async (
       } // Kết thúc vòng lặp shop
 
       // Xóa session sau khi đã xử lý xong hết các shop
+      console.log('🗑️ Deleting Redis session:', sessionKey);
       await redis.del(sessionKey);
+      console.log('✅ Order creation completed successfully for payment intent:', paymentIntent.id);
+
+    } else if (event.type === 'payment_intent.payment_failed') {
+      const paymentIntent = event.data.object as Stripe.PaymentIntent;
+      const sessionId = paymentIntent.metadata.sessionId;
+      const userId = paymentIntent.metadata.userId;
+
+      console.log('❌ Payment Intent Failed:', {
+        sessionId,
+        userId,
+        paymentIntentId: paymentIntent.id,
+        lastPaymentError: paymentIntent.last_payment_error?.message
+      });
+
+      // Update session status to 'failed'
+      const sessionKey = `payment_session:${userId}:${sessionId}`;
+      const sessionData = await redis.get(sessionKey);
+      
+      if (sessionData) {
+        const parsedSession = JSON.parse(sessionData);
+        parsedSession.status = 'failed';
+        parsedSession.errorMessage = paymentIntent.last_payment_error?.message;
+        await redis.set(sessionKey, JSON.stringify(parsedSession), 'EX', 30 * 60);
+        console.log('📝 Updated session status to failed');
+      }
+
+    } else if (event.type === 'payment_intent.canceled') {
+      const paymentIntent = event.data.object as Stripe.PaymentIntent;
+      const sessionId = paymentIntent.metadata.sessionId;
+      const userId = paymentIntent.metadata.userId;
+
+      console.log('🚫 Payment Intent Canceled:', {
+        sessionId,
+        userId,
+        paymentIntentId: paymentIntent.id
+      });
+
+      // Update session status to 'canceled'
+      const sessionKey = `payment_session:${userId}:${sessionId}`;
+      const sessionData = await redis.get(sessionKey);
+      
+      if (sessionData) {
+        const parsedSession = JSON.parse(sessionData);
+        parsedSession.status = 'canceled';
+        await redis.set(sessionKey, JSON.stringify(parsedSession), 'EX', 30 * 60);
+        console.log('📝 Updated session status to canceled');
+      }
+    } else {
+      console.log('ℹ️ Unhandled webhook event type:', event.type);
     }
 
     return res.status(200).json({ received: true });
   } catch (error) {
-    console.log(error);
+    console.error('💥 Error in webhook handler:', error);
     return next(error);
   }
 };
@@ -551,11 +646,11 @@ export const updateDeliveryStatus = async (
       where: { id: orderId },
       data: { deliveryStatus },
       include: {
-        user: { select: { id: true, name: true, email: true, avatar: true } },
+        user: { select: { id: true, name: true, email: true, images: true } },
         items: { include: { product: true } },
         shippingAddress: true,
         coupon: true,
-        shop: { select: { id: true, name: true, avatar: true } },
+        shop: { select: { id: true, name: true, images: true } },
       },
     });
 
@@ -720,9 +815,28 @@ export const getAdminOrders = async (
         },
       }
     );
+
+    // Calculate admin fee (10%) and seller earnings (90%) for each order
+    const ordersWithCalculations = orders.map((order: any) => {
+      const adminFee = order.total * 0.10;
+      const sellerEarnings = order.total * 0.90;
+      const paymentStatus = order.status?.toLowerCase() === 'paid' || order.status?.toLowerCase() === 'completed' 
+        ? 'paid' 
+        : order.status?.toLowerCase() === 'failed' 
+        ? 'failed' 
+        : 'pending';
+
+      return {
+        ...order,
+        adminFee,
+        sellerEarnings,
+        paymentStatus,
+      };
+    });
+
     return res.status(200).json({
       success: true,
-      orders,
+      orders: ordersWithCalculations,
     });
   } catch (error) {
     next(error);

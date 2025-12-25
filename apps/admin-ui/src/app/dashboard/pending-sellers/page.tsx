@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axiosInstance from '../../../utils/axiosInstance';
-import { Clock, CheckCircle, XCircle, Eye, FileText } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, Eye, FileText, CreditCard } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const fetchPendingSellers = async () => {
@@ -120,7 +120,7 @@ const PendingSellersPage = () => {
     <div className='w-full min-h-screen p-8'>
       <div className='mb-6'>
         <h2 className='text-2xl font-semibold text-gray-900 mb-2'>Pending Sellers</h2>
-        <p className='text-gray-600'>Review and approve or reject seller verification requests</p>
+        <p className='text-gray-600'>Review and approve or reject seller verification requests. Only sellers with completed bank connections are shown.</p>
       </div>
 
       {sellers.length === 0 ? (
@@ -147,6 +147,9 @@ const PendingSellersPage = () => {
                     Resubmissions
                   </th>
                   <th className='px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider'>
+                    Bank Connection
+                  </th>
+                  <th className='px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider'>
                     Actions
                   </th>
                 </tr>
@@ -170,6 +173,19 @@ const PendingSellersPage = () => {
                     </td>
                     <td className='px-6 py-4 whitespace-nowrap'>
                       <div className='text-sm text-gray-900'>{seller.resubmissionCount || 0}</div>
+                    </td>
+                    <td className='px-6 py-4 whitespace-nowrap'>
+                      {seller.stripeId ? (
+                        <span className='inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800'>
+                          <CreditCard size={12} />
+                          Connected
+                        </span>
+                      ) : (
+                        <span className='inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800'>
+                          <CreditCard size={12} />
+                          Not Connected
+                        </span>
+                      )}
                     </td>
                     <td className='px-6 py-4 whitespace-nowrap text-sm font-medium'>
                       <div className='flex items-center gap-2'>
@@ -237,6 +253,23 @@ const PendingSellersPage = () => {
                 <div>
                   <label className='block text-sm font-medium text-gray-700 mb-1'>Country</label>
                   <p className='text-gray-900'>{selectedSeller.country}</p>
+                </div>
+                <div>
+                  <label className='block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2'>
+                    <CreditCard size={16} />
+                    Bank Connection
+                  </label>
+                  {selectedSeller.stripeId ? (
+                    <span className='inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800'>
+                      <CreditCard size={12} />
+                      Connected
+                    </span>
+                  ) : (
+                    <span className='inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800'>
+                      <CreditCard size={12} />
+                      Not Connected
+                    </span>
+                  )}
                 </div>
                 {selectedSeller.documents && (
                   <div>

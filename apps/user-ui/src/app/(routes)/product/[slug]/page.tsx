@@ -57,6 +57,8 @@ const Page = async ({ params }: { params: Promise<{ slug: string }> }) => {
 
   // Map backend data to component props
   const mappedProductDetails = {
+    id: product.id,
+    shopId: product.shopId,
     title: product.title,
     images: product.images?.map((img: any) => img.url) || [],
     rating: product.ratings || 0,

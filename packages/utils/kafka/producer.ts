@@ -161,4 +161,40 @@ export const publishNotificationEvent = async (event: NotificationEvent) => {
   }
 };
 
+/**
+ * Broadcast notification to all admins
+ * This is useful for system-wide notifications like new product submissions, seller verifications, etc.
+ */
+export const broadcastNotificationToAdmins = async (
+  event: Omit<NotificationEvent, 'receiverId'>
+) => {
+  try {
+    const prisma = await getPrisma();
+    
+    // Fetch all admin IDs
+    const admins = await prisma.admins.findMany({
+      select: { id: true }
+    });
+
+    if (admins.length === 0) {
+      console.warn('No admins found to broadcast notification');
+      return;
+    }
+
+    // Send notification to each admin
+    const notificationPromises = admins.map((admin: any) => 
+      publishNotificationEvent({
+        ...event,
+        receiverId: admin.id
+      })
+    );
+
+    await Promise.all(notificationPromises);
+    console.log(`Broadcast notification to ${admins.length} admins: ${event.title}`);
+  } catch (error) {
+    console.error("Failed to broadcast notification to admins:", error);
+    // Don't throw - this is a notification feature, shouldn't break main flow
+  }
+};
+
 export { producer };

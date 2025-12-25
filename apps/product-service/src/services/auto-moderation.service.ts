@@ -1,4 +1,4 @@
-import { BANNED_KEYWORDS, SENSITIVE_CATEGORIES } from '../config/moderation.config';
+import prisma from '@packages/libs/prisma';
 
 interface ProductData {
   title: string;
@@ -16,12 +16,76 @@ interface ModerationResult {
   reasons: string[];
 }
 
+// Cache for moderation config (refresh every 5 minutes)
+let cachedConfig: {
+  bannedKeywords: string[];
+  sensitiveCategories: string[];
+  autoApproveThreshold: number;
+  lastFetch: number;
+} | null = null;
+
+const CONFIG_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Get moderation config from database with caching
+ */
+const getModerationConfig = async () => {
+  const now = Date.now();
+  
+  // Return cached config if still valid
+  if (cachedConfig && (now - cachedConfig.lastFetch) < CONFIG_CACHE_DURATION) {
+    return cachedConfig;
+  }
+
+  // Fetch from database
+  const dbConfig = await prisma.moderation_config.findFirst({
+    orderBy: { updatedAt: 'desc' }
+  });
+
+  // Create default config if none exists
+  if (!dbConfig) {
+    const defaultConfig = await prisma.moderation_config.create({
+      data: {
+        bannedKeywords: [
+          'weapon', 'weapons', 'gun', 'guns', 'knife', 'knives',
+          'drug', 'drugs', 'cocaine', 'heroin', 'marijuana',
+          'counterfeit', 'fake', 'replica',
+          'adult', 'porn', 'pornography', 'xxx',
+          'wildlife', 'ivory', 'endangered',
+          'illegal', 'stolen', 'hacked'
+        ],
+        sensitiveCategories: [
+          'cosmetics', 'health supplements', 'pharmaceuticals',
+          'food', 'luxury goods', 'electronics', 'jewelry'
+        ],
+        autoApproveThreshold: 90
+      }
+    });
+    
+    cachedConfig = {
+      bannedKeywords: defaultConfig.bannedKeywords,
+      sensitiveCategories: defaultConfig.sensitiveCategories,
+      autoApproveThreshold: defaultConfig.autoApproveThreshold,
+      lastFetch: now
+    };
+  } else {
+    cachedConfig = {
+      bannedKeywords: dbConfig.bannedKeywords,
+      sensitiveCategories: dbConfig.sensitiveCategories,
+      autoApproveThreshold: dbConfig.autoApproveThreshold,
+      lastFetch: now
+    };
+  }
+
+  return cachedConfig;
+};
+
 /**
  * Check if text contains banned keywords (case-insensitive)
  */
-const containsBannedKeywords = (text: string): boolean => {
+const containsBannedKeywords = (text: string, bannedKeywords: string[]): boolean => {
   const lowerText = text.toLowerCase();
-  return BANNED_KEYWORDS.some(keyword => lowerText.includes(keyword.toLowerCase()));
+  return bannedKeywords.some(keyword => lowerText.includes(keyword.toLowerCase()));
 };
 
 /**
@@ -62,31 +126,34 @@ const calculateModerationScore = (
 /**
  * Main moderation check function
  */
-export const checkProductModeration = (productData: ProductData): ModerationResult => {
+export const checkProductModeration = async (productData: ProductData): Promise<ModerationResult> => {
+  // Get moderation config from database (with caching)
+  const config = await getModerationConfig();
+  
   const reasons: string[] = [];
   let hasBannedKeywords = false;
 
   // Check title
-  if (containsBannedKeywords(productData.title)) {
+  if (containsBannedKeywords(productData.title, config.bannedKeywords)) {
     hasBannedKeywords = true;
     reasons.push('Title contains prohibited keywords');
   }
 
   // Check short description
-  if (containsBannedKeywords(productData.short_description)) {
+  if (containsBannedKeywords(productData.short_description, config.bannedKeywords)) {
     hasBannedKeywords = true;
     reasons.push('Short description contains prohibited keywords');
   }
 
   // Check detailed description
-  if (productData.detailed_description && containsBannedKeywords(productData.detailed_description)) {
+  if (productData.detailed_description && containsBannedKeywords(productData.detailed_description, config.bannedKeywords)) {
     hasBannedKeywords = true;
     reasons.push('Detailed description contains prohibited keywords');
   }
 
   // Check tags
   if (productData.tags && productData.tags.length > 0) {
-    const bannedInTags = productData.tags.some(tag => containsBannedKeywords(tag));
+    const bannedInTags = productData.tags.some(tag => containsBannedKeywords(tag, config.bannedKeywords));
     if (bannedInTags) {
       hasBannedKeywords = true;
       reasons.push('Tags contain prohibited keywords');
@@ -94,7 +161,7 @@ export const checkProductModeration = (productData: ProductData): ModerationResu
   }
 
   // Check if category is sensitive
-  const isSensitiveCategory = SENSITIVE_CATEGORIES.some(
+  const isSensitiveCategory = config.sensitiveCategories.some(
     cat => productData.category.toLowerCase().includes(cat.toLowerCase())
   );
 
@@ -117,11 +184,11 @@ export const checkProductModeration = (productData: ProductData): ModerationResu
   // Decision logic:
   // - If banned keywords found: reject
   // - If sensitive category: pending (needs manual review)
-  // - If score >= 90: auto approve
+  // - If score >= threshold: auto approve
   // - Otherwise: pending (needs manual review)
 
   const shouldReject = hasBannedKeywords;
-  const shouldApprove = !hasBannedKeywords && !isSensitiveCategory && moderationScore >= 90;
+  const shouldApprove = !hasBannedKeywords && !isSensitiveCategory && moderationScore >= config.autoApproveThreshold;
 
   return {
     shouldApprove,
@@ -130,4 +197,3 @@ export const checkProductModeration = (productData: ProductData): ModerationResu
     reasons,
   };
 };
-

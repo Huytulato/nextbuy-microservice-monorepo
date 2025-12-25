@@ -1,7 +1,7 @@
 'use client'
 import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { Heart, ShoppingCart, Eye, Percent, Check, Truck, TrendingUp, Clock, Store } from 'lucide-react'
+import { Heart, ShoppingCart, Percent, Check, Truck, TrendingUp, Clock, Store } from 'lucide-react'
 import { Rating } from '../ratings'
 import { useStore } from '../../../store'
 
@@ -308,15 +308,16 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
           {/* Quick Actions Overlay */}
           {showQuickActions && isInStock && isSaleActive && (
-            <div className={`absolute inset-0 bg-gradient-to-t from-black/30 to-transparent flex items-end justify-center pb-12 gap-2 transition-opacity duration-300 ${
+            <div className={`absolute inset-0 bg-gradient-to-t from-black/30 to-transparent flex items-end justify-center pb-12 gap-2 transition-opacity duration-300 z-20 ${
               isHovered ? 'opacity-100' : 'opacity-0'
             }`}>
               <button 
                 onClick={handleAddToWishlist}
-                className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all duration-200 hover:scale-110 ${
+                onMouseDown={(e) => e.preventDefault()}
+                className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all duration-200 hover:scale-110 z-30 relative ${
                   isWishlisted 
                     ? 'bg-red-600 text-white' 
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                    : 'bg-white text-red-600 hover:bg-red-50'
                 }`}
                 title={isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}
               >
@@ -325,8 +326,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
               <button 
                 onClick={handleAddToCart}
+                onMouseDown={(e) => e.preventDefault()}
                 disabled={isAddingToCart}
-                className="h-10 px-5 bg-red-600 rounded-full flex items-center justify-center gap-2 shadow-lg text-white font-medium hover:bg-red-700 transition-all duration-200 disabled:opacity-70"
+                className="h-10 px-5 bg-red-600 rounded-full flex items-center justify-center gap-2 shadow-lg text-white font-medium hover:bg-red-700 transition-all duration-200 disabled:opacity-70 z-30 relative"
               >
                 {isAddingToCart ? (
                   <>
@@ -340,14 +342,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
                   </>
                 )}
               </button>
-
-              <Link 
-                href={`/product/${product.slug}`}
-                className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-gray-50 hover:scale-110 transition-all duration-200"
-                title="Quick View"
-              >
-                <Eye className="w-5 h-5 text-gray-700" />
-              </Link>
             </div>
           )}
         </Link>

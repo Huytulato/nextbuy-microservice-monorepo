@@ -14,7 +14,7 @@ const bannerSlides = [
     buttonLink: "/products?sale=summer",
     bgGradient: "from-red-700 via-red-600 to-red-800",
     accentColor: "#ffbf34",
-    image: "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=600&q=80",
+    image: "https://ik.imagekit.io/nextbuy/banners/summer-sale.jpg",
   },
   {
     id: 2,
@@ -25,7 +25,7 @@ const bannerSlides = [
     buttonLink: "/products?sort=latest",
     bgGradient: "from-amber-600 via-orange-500 to-red-600",
     accentColor: "#fff",
-    image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=600&q=80",
+    image: "https://ik.imagekit.io/nextbuy/banners/new-arrivals.jpg",
   },
   {
     id: 3,
@@ -36,7 +36,7 @@ const bannerSlides = [
     buttonLink: "/deals",
     bgGradient: "from-purple-700 via-red-600 to-pink-600",
     accentColor: "#ffbf34",
-    image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=600&q=80",
+    image: "https://ik.imagekit.io/nextbuy/banners/flash-deals.jpg",
   },
 ]
 

@@ -70,136 +70,138 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
   }, [order?.items]);
 
   return (
-    <div className="w-full min-h-screen bg-gradient-to-b from-[#070d1f] to-[#040713] text-white p-8">
-      <Link href="/dashboard/orders" className="inline-flex items-center gap-2 text-slate-300 hover:text-white transition-colors">
-        <ChevronLeft size={18} />
-        Go Back to Dashboard
-      </Link>
+  <div className="w-full min-h-screen bg-white text-slate-900 p-8">
+    <Link href="/dashboard/orders" className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-colors">
+      <ChevronLeft size={18} />
+      Go Back to Dashboard
+    </Link>
 
-      {isLoading ? (
-        <div className="mt-10 text-slate-400">Loading order...</div>
-      ) : !order ? (
-        <div className="mt-10 text-slate-400">Order not found.</div>
-      ) : (
-        <div className="mt-8 max-w-5xl">
-          <div className="flex items-start justify-between gap-6">
-            <div>
-              <h1 className="text-2xl font-semibold">Order #{String(order.id).slice(-6).toUpperCase()}</h1>
-              <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
-                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs border ${statusBadge(order.status)}`}>
-                  Payment: {(order.status || 'unknown').toString()}
-                </span>
-                <span className="text-slate-400">Total Paid: <span className="text-slate-200">${Number(order.total || 0).toFixed(2)}</span></span>
-                <span className="text-slate-400">Date: <span className="text-slate-200">{formatDate(order.createdAt)}</span></span>
-              </div>
-            </div>
-
-            <div className="min-w-[240px]">
-              <label className="block text-sm text-slate-300 mb-2">Update Delivery Status:</label>
-              <select
-                value={deliveryStatus}
-                onChange={(e) => mutation.mutate(e.target.value as DeliveryStatus)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-slate-100 outline-none focus:ring-2 focus:ring-blue-500"
-                disabled={mutation.isPending}
-              >
-                {DELIVERY_STEPS.map((s) => (
-                  <option key={s.key} value={s.key} className="text-black">
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-              {mutation.isPending && <div className="mt-2 text-xs text-slate-400">Updating...</div>}
+    {isLoading ? (
+      <div className="mt-10 text-slate-500">Loading order...</div>
+    ) : !order ? (
+      <div className="mt-10 text-slate-500">Order not found.</div>
+    ) : (
+      <div className="mt-8 max-w-5xl">
+        <div className="flex items-start justify-between gap-6">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Order #{String(order.id).slice(-6).toUpperCase()}</h1>
+            <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
+              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${statusBadge(order.status)}`}>
+                Payment: {(order.status || 'unknown').toString()}
+              </span>
+              <span className="text-slate-500 font-medium">Total Paid: <span className="text-slate-900">${Number(order.total || 0).toFixed(2)}</span></span>
+              <span className="text-slate-500">Date: <span className="text-slate-700">{formatDate(order.createdAt)}</span></span>
             </div>
           </div>
 
-          {/* Stepper */}
-          <div className="mt-8">
-            <div className="flex items-center justify-between gap-3">
-              {DELIVERY_STEPS.map((step, idx) => {
-                const done = idx <= activeStepIndex;
-                return (
-                  <div key={step.key} className="flex-1">
-                    <div className="text-xs mb-2 text-slate-400">{step.label}</div>
-                    <div className="relative flex items-center">
-                      <div className={`h-[2px] w-full ${idx === 0 ? 'opacity-0' : done ? 'bg-blue-500' : 'bg-white/10'}`} />
-                      <div className="absolute -left-1">
-                        <div className={`w-3.5 h-3.5 rounded-full border ${done ? 'bg-blue-500 border-blue-400' : 'bg-[#070d1f] border-white/20'}`} />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Shipping */}
-          <div className="mt-10">
-            <h2 className="text-lg font-semibold mb-3">Shipping Address</h2>
-            <div className="bg-white/5 border border-white/10 rounded-xl p-5 text-slate-200">
-              {order.shippingAddress ? (
-                <div className="space-y-1 text-sm">
-                  <div className="text-slate-100 font-medium">{order.shippingAddress.fullName}</div>
-                  <div className="text-slate-300">{order.shippingAddress.phone}</div>
-                  <div className="text-slate-300">
-                    {order.shippingAddress.address}, {order.shippingAddress.city}, {order.shippingAddress.province}{' '}
-                    {order.shippingAddress.postalCode}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-slate-400 text-sm">No shipping address found.</div>
-              )}
-            </div>
-          </div>
-
-          {/* Items */}
-          <div className="mt-10">
-            <h2 className="text-lg font-semibold mb-3">Order Items</h2>
-            <div className="space-y-3">
-              {items.map((item: any) => {
-                const product = item.product;
-                const imageUrl = product?.images?.[0]?.url;
-                const options = Array.isArray(item.selectedOptions) ? item.selectedOptions : [];
-
-                return (
-                  <div key={item.id} className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-4 min-w-0">
-                      <div className="w-12 h-12 rounded-lg overflow-hidden bg-white/10 flex items-center justify-center">
-                        {imageUrl ? (
-                          <Image src={imageUrl} alt={product?.title || 'product'} width={48} height={48} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="text-xs text-slate-500">No Image</div>
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-slate-100 font-medium truncate">{product?.title || 'Item'}</div>
-                        <div className="text-xs text-slate-400 mt-0.5">
-                          Quantity: {item.quantity}
-                          {options.length > 0 ? (
-                            <span className="ml-3">
-                              {options
-                                .map((o: any) => {
-                                  if (typeof o === 'string') return o;
-                                  if (o?.name && o?.value) return `${o.name}: ${o.value}`;
-                                  if (o?.label && o?.value) return `${o.label}: ${o.value}`;
-                                  return '';
-                                })
-                                .filter(Boolean)
-                                .join(' • ')}
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-slate-100 font-medium">${Number(item.price || 0).toFixed(2)}</div>
-                  </div>
-                );
-              })}
-            </div>
+          <div className="min-w-[240px]">
+            <label className="block text-sm font-medium text-slate-700 mb-2">Update Delivery Status:</label>
+            <select
+              value={deliveryStatus}
+              onChange={(e) => mutation.mutate(e.target.value as DeliveryStatus)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+              disabled={mutation.isPending}
+            >
+              {DELIVERY_STEPS.map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+            {mutation.isPending && <div className="mt-2 text-xs text-blue-600 font-medium">Updating...</div>}
           </div>
         </div>
-      )}
-    </div>
+
+        {/* Stepper */}
+        <div className="mt-12 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+          <div className="flex items-center justify-between gap-3">
+            {DELIVERY_STEPS.map((step, idx) => {
+              const done = idx <= activeStepIndex;
+              return (
+                <div key={step.key} className="flex-1">
+                  <div className={`text-xs mb-2 font-semibold ${done ? 'text-blue-600' : 'text-slate-400'}`}>{step.label}</div>
+                  <div className="relative flex items-center">
+                    <div className={`h-[3px] w-full rounded-full ${idx === 0 ? 'opacity-0' : done ? 'bg-blue-500' : 'bg-slate-200'}`} />
+                    <div className="absolute -left-1">
+                      <div className={`w-4 h-4 rounded-full border-2 ${done ? 'bg-blue-500 border-white shadow-sm' : 'bg-white border-slate-300'}`} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Shipping */}
+        <div className="mt-10">
+          <h2 className="text-lg font-bold text-slate-900 mb-4">Shipping Address</h2>
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+            {order.shippingAddress ? (
+              <div className="space-y-1.5 text-sm">
+                <div className="text-slate-900 font-bold text-base">{order.shippingAddress.fullName}</div>
+                <div className="text-slate-600 flex items-center gap-2">
+                  <span className="w-1 h-1 bg-slate-400 rounded-full"></span>
+                  {order.shippingAddress.phone}
+                </div>
+                <div className="text-slate-600 leading-relaxed">
+                  {order.shippingAddress.address}, {order.shippingAddress.city}, {order.shippingAddress.province}{' '}
+                  <span className="font-mono text-slate-900 font-medium">{order.shippingAddress.postalCode}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="text-slate-400 text-sm italic">No shipping address found.</div>
+            )}
+          </div>
+        </div>
+
+        {/* Items */}
+        <div className="mt-10">
+          <h2 className="text-lg font-bold text-slate-900 mb-4">Order Items</h2>
+          <div className="grid gap-4">
+            {items.map((item: any) => {
+              const product = item.product;
+              const imageUrl = product?.images?.[0]?.url;
+              const options = Array.isArray(item.selectedOptions) ? item.selectedOptions : [];
+
+              return (
+                <div key={item.id} className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center justify-between gap-4 hover:border-slate-300 transition-colors shadow-sm">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 border border-slate-100 flex items-center justify-center flex-shrink-0">
+                      {imageUrl ? (
+                        <Image src={imageUrl} alt={product?.title || 'product'} width={64} height={64} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="text-[10px] text-slate-400 font-medium text-center px-1">No Image</div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-slate-900 font-bold truncate text-base">{product?.title || 'Item'}</div>
+                      <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
+                        <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-medium">Qty: {item.quantity}</span>
+                        {options.length > 0 && (
+                          <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
+                            {options.map((o: any, i: number) => (
+                              <span key={i} className="text-slate-500">
+                                {typeof o === 'string' ? o : o.value}
+                                {i < options.length - 1 && " • "}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="text-slate-900 font-bold text-lg">${Number(item.price || 0).toFixed(2)}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    )}
+  </div>
   );
 }
 

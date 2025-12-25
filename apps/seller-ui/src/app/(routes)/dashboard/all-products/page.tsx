@@ -1,12 +1,13 @@
 'use client'
 import React, { useMemo, useState } from 'react'
 import {useReactTable, getCoreRowModel, getFilteredRowModel, flexRender} from '@tanstack/react-table'
-import { Search, Pencil, Star, Plus, ChevronRight, Eye, Trash2, BarChart3 } from 'lucide-react'
+import { Search, Pencil, Star, Plus, ChevronRight, Eye, Trash2, BarChart3, Send, History, X } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 import axiosInstance from 'apps/seller-ui/src/utils/axiosInstance'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query' 
 import DeleteConfirmationModal from 'apps/seller-ui/src/shared/components/modals/delete.confirmation.modal'
+import toast from 'react-hot-toast'
 
 
 
@@ -25,12 +26,24 @@ const restoreProduct = async (productId: string) => {
   return res?.data;
 }
 
+const submitDraftProduct = async (productId: string) => {
+  const res = await axiosInstance.post(`/product/api/submit-draft/${productId}`);
+  return res?.data;
+}
+
+const fetchProductHistory = async (productId: string) => {
+  const res = await axiosInstance.get(`/product/api/product-history/${productId}`);
+  return res?.data;
+}
+
 const ProductList = () => {
   const [globalFilter, setGlobalFilter] = useState("");
   const [analyticsData, setAnalyticsData] = useState(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>();
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [selectedProductForHistory, setSelectedProductForHistory] = useState<string | null>(null);
 
   // Note: analytics UI is not implemented yet, but keep the state for future work.
   void analyticsData;
@@ -56,6 +69,23 @@ const ProductList = () => {
       queryClient.invalidateQueries({ queryKey: ["shop-products"] });
       setShowDeleteModal(false);
     },
+  });
+
+  const submitDraftMutation = useMutation({
+    mutationFn: submitDraftProduct,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["shop-products"] });
+      toast.success(data?.message || 'Draft submitted for review successfully!');
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to submit draft');
+    },
+  });
+
+  const { data: historyData, isLoading: historyLoading } = useQuery({
+    queryKey: ['product-history', selectedProductForHistory],
+    queryFn: () => selectedProductForHistory ? fetchProductHistory(selectedProductForHistory) : null,
+    enabled: !!selectedProductForHistory && showHistoryModal,
   });
 
   const columns = useMemo(
@@ -174,6 +204,17 @@ const ProductList = () => {
             const rejectionReason = row.original.rejectionReason;
             return (
               <div className="flex items-center gap-2">
+                {/* Submit Draft Button - Only show for draft products */}
+                {status === 'draft' && (
+                  <button
+                    onClick={() => submitDraftMutation.mutate(row.original.id)}
+                    className="p-1.5 rounded-md hover:bg-green-50 transition-colors"
+                    title="Submit for Review"
+                    disabled={submitDraftMutation.isPending}
+                  >
+                    <Send size={16} className="text-green-500" />
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     window.open(`${process.env.NEXT_PUBLIC_USER_UI_LINK || ''}/product/${row.original.slug}`, '_blank');
@@ -202,6 +243,16 @@ const ProductList = () => {
                   <BarChart3 size={16} className="text-green-400" />
                 </button>
                 <button
+                  onClick={() => {
+                    setSelectedProductForHistory(row.original.id);
+                    setShowHistoryModal(true);
+                  }}
+                  className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                  title="View History"
+                >
+                  <History size={16} className="text-purple-400" />
+                </button>
+                <button
                   onClick={() => openDeleteModal(row.original)}
                   className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
                   title="Delete Product"
@@ -219,7 +270,7 @@ const ProductList = () => {
             );
           },
         },
-      ], []
+      ], [submitDraftMutation]
   );
 
     const table = useReactTable({
@@ -346,6 +397,108 @@ const ProductList = () => {
           }}
           onRestore={() => restoreMutation.mutate(selectedProduct?.id)}
         />
+      )}
+
+      {/* Product History Modal */}
+      {showHistoryModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-4 flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <History size={24} />
+                  Product History
+                </h2>
+                {historyData?.product && (
+                  <p className="text-sm mt-1 opacity-90">{historyData.product.title}</p>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  setShowHistoryModal(false);
+                  setSelectedProductForHistory(null);
+                }}
+                className="p-1 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(80vh-100px)]">
+              {historyLoading ? (
+                <div className="flex justify-center items-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+                </div>
+              ) : historyData?.history && historyData.history.length > 0 ? (
+                <div className="space-y-4">
+                  {historyData.history.map((entry: any, index: number) => (
+                    <div
+                      key={entry.id}
+                      className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold text-gray-900">
+                              {entry.changeType === 'auto_moderation' && '🤖 Auto-Moderation'}
+                              {entry.changeType === 'moderation_approve' && '✅ Approved'}
+                              {entry.changeType === 'moderation_reject' && '❌ Rejected'}
+                              {entry.changeType === 'edit' && '✏️ Edited'}
+                              {entry.changeType === 'edit_requires_review' && '🔄 Edited (Requires Review)'}
+                            </span>
+                            {entry.changes?.status && (
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                entry.changes.status === 'active' ? 'bg-green-100 text-green-800' :
+                                entry.changes.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                entry.changes.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {entry.changes.status}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600">
+                            By: <span className="font-medium">{entry.changedByName}</span>
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {new Date(entry.createdAt).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Reason */}
+                      {entry.reason && (
+                        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm">
+                          <span className="font-medium text-red-800">Reason: </span>
+                          <span className="text-red-700">{entry.reason}</span>
+                        </div>
+                      )}
+
+                      {/* Changes Detail */}
+                      {entry.changes && Object.keys(entry.changes).length > 0 && (
+                        <details className="mt-2">
+                          <summary className="text-sm text-purple-600 cursor-pointer hover:text-purple-800">
+                            View Details
+                          </summary>
+                          <pre className="mt-2 p-2 bg-gray-50 rounded text-xs overflow-x-auto">
+                            {JSON.stringify(entry.changes, null, 2)}
+                          </pre>
+                        </details>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  <History size={48} className="mx-auto mb-4 opacity-30" />
+                  <p>No history available for this product</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}    
     </div>
   )

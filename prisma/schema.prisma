@@ -314,4 +314,12 @@ model notifications {
   updateAt      DateTime @updatedAt
 }
 
-
+model moderation_config {
+  id                    String   @id @default(auto()) @map("_id") @db.ObjectId
+  bannedKeywords        String[]
+  sensitiveCategories   String[]
+  autoApproveThreshold  Int      @default(90)
+  updatedBy             String?  @db.ObjectId
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}

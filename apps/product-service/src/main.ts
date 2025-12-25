@@ -41,7 +41,7 @@ app.use(errorMiddleware); // use custom error handling middleware to handle erro
 const port = process.env.PORT || 6002;
 const server = app.listen(port, () => {
     console.log(`Product service is running at http://localhost:${port}/api`);
-    console.log(`Swagger UI is running at http://localhost:${port}/docs`);
+    console.log(`Swagger UI is running at http://localhost:${port}/api-docs`);
 })
 
 // Handle server error

@@ -1,10 +1,26 @@
 "use client";
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
+import { useStore } from '../../../store'
+import useUser from '../../../hooks/useUser'
 
 const ProductDetails = ({ProductDetails}: {ProductDetails: any}) => {
     const [quantity, setQuantity] = useState(1);
     const [selectedSize, setSelectedSize] = useState(ProductDetails?.sizes?.[0] || 'XS');
-    const [isWishlisted, setIsWishlisted] = useState(false);
+    const [isAddingToCart, setIsAddingToCart] = useState(false);
+    
+    // Zustand store selectors
+    const addToWishlist = useStore((state: any) => state.addToWishlist)
+    const removeFromWishlist = useStore((state: any) => state.removeFromWishlist)
+    const addToCart = useStore((state: any) => state.addToCart)
+    const wishlist = useStore((state: any) => state.wishlist)
+    
+    // Get user for tracking
+    const { user } = useUser()
+    
+    // Check if product is in wishlist
+    const isWishlisted = useMemo(() => {
+        return ProductDetails?.id ? wishlist.some((item: any) => item.id === ProductDetails.id) : false
+    }, [wishlist, ProductDetails?.id])
 
     const handleQuantityChange = (type: 'increment' | 'decrement') => {
         if (type === 'increment') {
@@ -21,6 +37,42 @@ const ProductDetails = ({ProductDetails}: {ProductDetails: any}) => {
         }
         return 0;
     };
+
+    // Transform product for store
+    const transformProductForStore = () => ({
+        id: ProductDetails.id,
+        title: ProductDetails.title,
+        price: ProductDetails.price,
+        image: ProductDetails.images?.[0] || '/placeholder-product.png',
+        quantity: quantity,
+        shopId: ProductDetails.shopId,
+    })
+
+    // Handle add to cart
+    const handleAddToCart = () => {
+        if (!ProductDetails?.stock || ProductDetails.stock === 0) return;
+        if (!ProductDetails?.id || !ProductDetails?.shopId) return;
+        
+        setIsAddingToCart(true)
+        
+        const storeProduct = transformProductForStore()
+        addToCart(storeProduct, user, window.location.pathname, navigator.userAgent)
+        
+        setTimeout(() => setIsAddingToCart(false), 1200)
+    }
+
+    // Handle add to wishlist (toggle)
+    const handleToggleWishlist = () => {
+        if (!ProductDetails?.id || !ProductDetails?.shopId) return;
+        
+        const storeProduct = transformProductForStore()
+        
+        if (isWishlisted) {
+            removeFromWishlist(ProductDetails.id, user, window.location.pathname, navigator.userAgent)
+        } else {
+            addToWishlist(storeProduct, user, window.location.pathname, navigator.userAgent)
+        }
+    }
 
     const renderStars = (rating: number) => {
         return (
@@ -89,8 +141,9 @@ const ProductDetails = ({ProductDetails}: {ProductDetails: any}) => {
                                 </h1>
                             </div>
                             <button
-                                onClick={() => setIsWishlisted(!isWishlisted)}
-                                className="text-2xl ml-4 focus:outline-none"
+                                onClick={handleToggleWishlist}
+                                className="text-2xl ml-4 focus:outline-none transition-transform hover:scale-110"
+                                aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
                             >
                                 {isWishlisted ? '❤️' : '🤍'}
                             </button>
@@ -197,14 +250,15 @@ const ProductDetails = ({ProductDetails}: {ProductDetails: any}) => {
                         {/* Add to Cart Button */}
                         <div className="mb-6">
                             <button
-                                disabled={ProductDetails?.stock === 0}
+                                onClick={handleAddToCart}
+                                disabled={ProductDetails?.stock === 0 || isAddingToCart}
                                 className={`w-full py-3 rounded-lg font-bold text-white transition-all ${
-                                    ProductDetails?.stock > 0
+                                    ProductDetails?.stock > 0 && !isAddingToCart
                                         ? 'bg-orange-500 hover:bg-orange-600'
                                         : 'bg-gray-400 cursor-not-allowed'
                                 }`}
                             >
-                                🛒 Add to Cart
+                                {isAddingToCart ? '✓ Added!' : '🛒 Add to Cart'}
                             </button>
                         </div>
 

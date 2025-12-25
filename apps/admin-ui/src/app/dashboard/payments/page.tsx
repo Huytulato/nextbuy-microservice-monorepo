@@ -11,11 +11,11 @@ import { format } from 'date-fns';
 
 interface Payment {
   id: string;
-  orderId: string;
-  amount: number;
+  total: number;
   paymentStatus: string;
   createdAt: string;
   user?: { name: string; email: string };
+  shop?: { name: string };
 }
 
 export default function PaymentsPage() {
@@ -35,9 +35,9 @@ export default function PaymentsPage() {
     const searchLower = searchTerm.toLowerCase();
     return (
       payment.id.toLowerCase().includes(searchLower) ||
-      payment.orderId?.toLowerCase().includes(searchLower) ||
       payment.user?.name?.toLowerCase().includes(searchLower) ||
-      payment.user?.email?.toLowerCase().includes(searchLower)
+      payment.user?.email?.toLowerCase().includes(searchLower) ||
+      payment.shop?.name?.toLowerCase().includes(searchLower)
     );
   });
 
@@ -47,15 +47,15 @@ export default function PaymentsPage() {
   const columns = [
     {
       key: 'id',
-      header: 'Payment ID',
+      header: 'Order ID',
       render: (payment: Payment) => (
         <span className="font-mono text-blue-600">#{payment.id.slice(-6)}</span>
       ),
     },
     {
-      key: 'orderId',
-      header: 'Order ID',
-      render: (payment: Payment) => payment.orderId || 'N/A',
+      key: 'shop',
+      header: 'Shop',
+      render: (payment: Payment) => payment.shop?.name || 'N/A',
     },
     {
       key: 'customer',
@@ -66,7 +66,7 @@ export default function PaymentsPage() {
       key: 'amount',
       header: 'Amount',
       render: (payment: Payment) => (
-        <span className="font-medium">${payment.amount?.toFixed(2) || '0.00'}</span>
+        <span className="font-medium">${payment.total?.toFixed(2) || '0.00'}</span>
       ),
     },
     {

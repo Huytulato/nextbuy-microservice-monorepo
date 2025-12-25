@@ -75,9 +75,16 @@ export const useStore = create<Store>()(
           }
 
           return {
-            cart: [...state.cart, { ...product, quantity: 1 }],
+            cart: [...state.cart, { ...product, quantity: product.quantity || 1 }],
           };
         });
+
+        // Sync localStorage and dispatch cart-updated event for count updates
+        if (typeof window !== 'undefined') {
+          const cart = get().cart;
+          localStorage.setItem('cartItems', JSON.stringify(cart));
+          window.dispatchEvent(new CustomEvent('cart-updated'));
+        }
 
         // Track event in Kafka
         if (user?.id) {
@@ -109,6 +116,13 @@ export const useStore = create<Store>()(
           cart: state.cart.filter((item) => item.id !== id),
         }));
 
+        // Sync localStorage and dispatch cart-updated event for count updates
+        if (typeof window !== 'undefined') {
+          const cart = get().cart;
+          localStorage.setItem('cartItems', JSON.stringify(cart));
+          window.dispatchEvent(new CustomEvent('cart-updated'));
+        }
+
         // Track event in Kafka
         if (user?.id && product) {
           trackEvent({
@@ -139,6 +153,13 @@ export const useStore = create<Store>()(
           ),
         }));
 
+        // Sync localStorage and dispatch cart-updated event for count updates
+        if (typeof window !== 'undefined') {
+          const cart = get().cart;
+          localStorage.setItem('cartItems', JSON.stringify(cart));
+          window.dispatchEvent(new CustomEvent('cart-updated'));
+        }
+
         console.log("Update cart quantity:", {
           productId: id,
           quantity,
@@ -152,6 +173,13 @@ export const useStore = create<Store>()(
         set((state) => ({
           wishlist: [...state.wishlist, product],
         }));
+
+        // Sync localStorage and dispatch wishlist-updated event for count updates
+        if (typeof window !== 'undefined') {
+          const wishlist = get().wishlist;
+          localStorage.setItem('wishlistItems', JSON.stringify(wishlist));
+          window.dispatchEvent(new CustomEvent('wishlist-updated'));
+        }
 
         // Track event in Kafka
         if (user?.id) {
@@ -182,6 +210,13 @@ export const useStore = create<Store>()(
           wishlist: state.wishlist.filter((item) => item.id !== id),
         }));
 
+        // Sync localStorage and dispatch wishlist-updated event for count updates
+        if (typeof window !== 'undefined') {
+          const wishlist = get().wishlist;
+          localStorage.setItem('wishlistItems', JSON.stringify(wishlist));
+          window.dispatchEvent(new CustomEvent('wishlist-updated'));
+        }
+
         // Track event in Kafka
         if (user?.id && product) {
           trackEvent({
@@ -206,6 +241,13 @@ export const useStore = create<Store>()(
 
       clearCart: () => {
         set({ cart: [] });
+
+        // Dispatch cart-updated event for count updates
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('cart-updated'));
+          // Sync localStorage for cross-tab sync
+          localStorage.setItem('cartItems', JSON.stringify([]));
+        }
 
         console.log("Clear cart");
       },

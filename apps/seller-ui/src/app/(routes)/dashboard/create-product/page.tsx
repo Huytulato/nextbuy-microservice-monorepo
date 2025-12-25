@@ -147,6 +147,42 @@ const DashboardPage = () => {
     }
   };
 
+  const handleSaveDraft = async () => {
+    try {
+      setLoading(true);
+      const formData = watch(); // Get current form data
+      const draftData = { ...formData, isDraft: true };
+      
+      if (editProductId) {
+        // Update existing product as draft
+        await axiosInstance.put(`/product/api/update-product/${editProductId}`, draftData);
+        toast.success('Draft saved successfully!');
+      } else {
+        // Create new product as draft
+        await axiosInstance.post('/product/api/create-product', draftData);
+        toast.success('Draft saved successfully!');
+      }
+      router.push('/dashboard/all-products');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error?.message || 'Failed to save draft');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmitDraft = async (productId: string) => {
+    try {
+      setLoading(true);
+      await axiosInstance.post(`/product/api/submit-draft/${productId}`);
+      toast.success('Draft submitted for review!');
+      router.push('/dashboard/all-products');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error?.message || 'Failed to submit draft');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const convertFileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -258,9 +294,7 @@ const DashboardPage = () => {
     setActiveEffect(null);
   };
 
-  const handleSaveDraft = () => {
-    // Logic to save draft
-  }
+
 
   const handleRemoveImage = async (index: number) => {
     try {
@@ -563,14 +597,28 @@ const DashboardPage = () => {
                       <Save size={18} />
                       {loading ? 'Saving...' : editProductId ? 'Update Product' : 'Save & Publish'}
                     </button>
-                    {isChanged && (
+                    {/* Show Save Draft button for new products or when editing drafts */}
+                    {(!editProductId || productData?.status === 'draft') && (
                       <button
                         type="button"
                         onClick={handleSaveDraft}
-                        className="w-full flex justify-center items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-all font-medium shadow-sm"
+                        disabled={loading}
+                        className="w-full flex justify-center items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-all font-medium shadow-sm disabled:opacity-50"
                       >
                         <Save size={18} />
                         Save Draft
+                      </button>
+                    )}
+                    {/* Show Submit Draft button only when editing a draft */}
+                    {editProductId && productData?.status === 'draft' && (
+                      <button
+                        type="button"
+                        onClick={() => handleSubmitDraft(editProductId)}
+                        disabled={loading}
+                        className="w-full flex justify-center items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg transition-all font-medium shadow-lg shadow-green-200 disabled:opacity-50"
+                      >
+                        <Package size={18} />
+                        Submit for Review
                       </button>
                     )}
                  </div>

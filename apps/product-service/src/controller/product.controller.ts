@@ -5,7 +5,7 @@ import { Prisma } from "@prisma/client";
 import { NextFunction, Request, Response } from "express";
 import { checkProductModeration } from "../services/auto-moderation.service";
 import { detectSignificantChanges } from "../services/product-change-detector.service";
-import { publishNotificationEvent } from "@packages/utils/kafka/producer";
+import { publishNotificationEvent, broadcastNotificationToAdmins } from "@packages/utils/kafka/producer";
 
 // get product categories
 export const getCategories = async (req: Request, res: Response, next: NextFunction) => {
@@ -20,13 +20,6 @@ export const getCategories = async (req: Request, res: Response, next: NextFunct
     return next(error);
   }
 }
-
-
-
-
-
-
-
 
 // upload product images
 export const uploadProductImages = async (req: Request, res: Response, next: NextFunction) => {
@@ -105,6 +98,7 @@ console.log("🔥 [DEBUG] Create Product Payload:");
     starting_date,
     ending_date,
     images = [],
+    isDraft = false, // New parameter for draft functionality
   } = req.body;
 
   const discountCodes: string[] = Array.isArray(discount_codes)
@@ -123,17 +117,23 @@ console.log("🧐 [DEBUG] Checking required fields:", {
         hasRegularPrice: !!regular_price
     });
   // Validate required fields - check stock properly (0 is valid)
-  if (!title || !short_description || !category || stock === undefined || stock === null || stock === '' || !sale_price || !regular_price) {
-    const missingFields = [];
-    if (!title) missingFields.push('title');
-    if (!short_description) missingFields.push('short_description');
-    if (!category) missingFields.push('category');
-    if (stock === undefined || stock === null || stock === '') missingFields.push('stock');
-    if (!sale_price) missingFields.push('sale_price');
-    if (!regular_price) missingFields.push('regular_price');
-    
-    console.error("❌ [VALIDATION] Missing required fields:", missingFields);
-    return next(new ValidationError(`Missing required fields: ${missingFields.join(', ')}`));
+  // For drafts, only title is required. For non-drafts, all fields are required.
+  if (!title) {
+    return next(new ValidationError('Title is required'));
+  }
+  
+  if (!isDraft) {
+    if (!short_description || !category || stock === undefined || stock === null || stock === '' || !sale_price || !regular_price) {
+      const missingFields = [];
+      if (!short_description) missingFields.push('short_description');
+      if (!category) missingFields.push('category');
+      if (stock === undefined || stock === null || stock === '') missingFields.push('stock');
+      if (!sale_price) missingFields.push('sale_price');
+      if (!regular_price) missingFields.push('regular_price');
+      
+      console.error("❌ [VALIDATION] Missing required fields:", missingFields);
+      return next(new ValidationError(`Missing required fields: ${missingFields.join(', ')}. Tip: Save as draft to continue later.`));
+    }
   }
 
   if (!req.seller.id) {
@@ -175,31 +175,38 @@ console.log("🧐 [DEBUG] Checking required fields:", {
     imagesCount: images.filter((img: any) => img && img.fileId && img.file_url).length
   });
 
-  // Run auto moderation check
-  const moderationResult = checkProductModeration({
-    title,
-    short_description,
-    detailed_description,
-    tags: processedTags,
-    category,
-    brand: brand || undefined,
-  });
-
-  // Determine product status based on moderation result
-  let productStatus: 'active' | 'pending' | 'rejected' = 'pending';
+  // Determine product status based on draft flag and moderation
+  let productStatus: 'active' | 'pending' | 'rejected' | 'draft' = 'pending';
   let rejectionReason: string | null = null;
   let isAutoModerated = false;
+  let moderationResult: any = { moderationScore: 0, reasons: [], shouldApprove: false, shouldReject: false };
 
-  if (moderationResult.shouldReject) {
-    productStatus = 'rejected';
-    rejectionReason = moderationResult.reasons.join(', ');
-    isAutoModerated = true;
-  } else if (moderationResult.shouldApprove) {
-    productStatus = 'active';
-    isAutoModerated = true;
+  if (isDraft) {
+    // Save as draft - no moderation
+    productStatus = 'draft';
+    console.log("💾 [DEBUG] Saving product as draft - skipping moderation");
   } else {
-    // Needs manual review
-    productStatus = 'pending';
+    // Run auto moderation check only for non-draft products
+    moderationResult = await checkProductModeration({
+      title,
+      short_description,
+      detailed_description,
+      tags: processedTags,
+      category,
+      brand: brand || undefined,
+    });
+
+    if (moderationResult.shouldReject) {
+      productStatus = 'rejected';
+      rejectionReason = moderationResult.reasons.join(', ');
+      isAutoModerated = true;
+    } else if (moderationResult.shouldApprove) {
+      productStatus = 'active';
+      isAutoModerated = true;
+    } else {
+      // Needs manual review
+      productStatus = 'pending';
+    }
   }
 
   const newProduct = await prisma.products.create({
@@ -261,15 +268,16 @@ console.log("🧐 [DEBUG] Checking required fields:", {
     },
   });
 
-  // Publish notification event for admin if product needs manual review
+  // Publish notification event for admin if product needs manual review (not for drafts)
   if (productStatus === 'pending') {
-    await publishNotificationEvent({
+    await broadcastNotificationToAdmins({
       title: "🔍 New Product Pending Review",
       message: `Seller ${req.seller.name || req.seller.email} submitted a new product "${title}" for review.`,
       creatorId: req.seller.id,
-      receiverId: 'admin',
       redirect_link: `/dashboard/moderation/pending-products`,
     });
+  } else if (productStatus === 'draft') {
+    console.log("📝 [DEBUG] Draft saved - no notification sent");
   }
 
   res.status(200).json({
@@ -374,7 +382,7 @@ export const updateProduct = async (req: any, res: Response, next: NextFunction)
       newStatus = 'pending';
       
       // Run auto moderation on updated product
-      const moderationResult = checkProductModeration({
+      const moderationResult = await checkProductModeration({
         title: title || oldProduct.title,
         short_description: short_description || oldProduct.short_description,
         detailed_description: detailed_description || oldProduct.detailed_description,
@@ -425,7 +433,7 @@ export const updateProduct = async (req: any, res: Response, next: NextFunction)
         newStatus = 'pending';
 
         // Run auto moderation on updated product
-        const moderationResult = checkProductModeration({
+        const moderationResult = await checkProductModeration({
           title: title || oldProduct.title,
           short_description: short_description || oldProduct.short_description,
           detailed_description: detailed_description || oldProduct.detailed_description,
@@ -435,13 +443,13 @@ export const updateProduct = async (req: any, res: Response, next: NextFunction)
         });
 
         // If auto moderation rejects, set to rejected
+        // IMPORTANT: Do NOT auto-approve when there are significant changes
+        // Significant changes MUST go through manual admin review
         if (moderationResult.shouldReject) {
           newStatus = 'rejected';
-        } else if (moderationResult.shouldApprove) {
-          // If auto approves, keep as active (no re-review needed)
-          requiresReReview = false;
-          newStatus = 'active';
+          requiresReReview = false; // Already rejected, no need to review
         }
+        // else: keep status as 'pending' for manual review
       }
     }
 
@@ -509,11 +517,10 @@ export const updateProduct = async (req: any, res: Response, next: NextFunction)
         ? 'resubmitted a previously rejected product' 
         : 'updated a product that requires re-review';
       
-      await publishNotificationEvent({
+      await broadcastNotificationToAdmins({
         title: "🔄 Product Update Pending Review",
         message: `Seller ${req.seller.name || req.seller.email} ${actionText}: "${updatedProduct.title}".`,
         creatorId: req.seller.id,
-        receiverId: 'admin',
         redirect_link: `/dashboard/moderation/pending-products`,
       });
     }
@@ -639,8 +646,6 @@ export const restoreDeletedProduct = async (req: any, res: Response, next: NextF
     next(error);
   }
 }
-
-
 
 // get All products 
 export const getAllProducts = async (req: Request, res: Response, next: NextFunction) => {
@@ -1256,14 +1261,225 @@ export const getPublicShopProducts = async (req: Request, res: Response, next: N
       success: true,
       products,
       pagination: {
-        total,
-        page,
+        currentPage: page,
         totalPages,
-        hasNextPage: page < totalPages,
-        hasPrevPage: page > 1,
+        totalItems: total,
+        hasMore: page < totalPages
       }
     });
   } catch (error) {
+    return next(error);
+  }
+};
+
+// Submit draft product for review
+export const submitDraftForReview = async (req: any, res: Response, next: NextFunction) => {
+  try {
+    const { productId } = req.params;
+
+    if (!productId) {
+      return next(new ValidationError("Product ID is required"));
+    }
+
+    // Find the draft product
+    const product = await prisma.products.findUnique({
+      where: { id: productId },
+      include: { shops: { include: { sellers: true } } }
+    });
+
+    if (!product) {
+      return next(new NotFoundError("Product not found"));
+    }
+
+    // Verify seller owns this product
+    if (product.shops?.sellers?.id !== req.seller.id) {
+      return next(new AuthError("You don't have permission to modify this product"));
+    }
+
+    // Check if product is draft
+    if (product.status !== 'draft') {
+      return next(new ValidationError("Only draft products can be submitted for review"));
+    }
+
+    // Validate required fields before submission
+    if (!product.short_description || !product.category || 
+        product.stock === undefined || product.stock === null || 
+        !product.sale_price || !product.regular_price) {
+      const missingFields = [];
+      if (!product.short_description) missingFields.push('short_description');
+      if (!product.category) missingFields.push('category');
+      if (product.stock === undefined || product.stock === null) missingFields.push('stock');
+      if (!product.sale_price) missingFields.push('sale_price');
+      if (!product.regular_price) missingFields.push('regular_price');
+      
+      return next(new ValidationError(
+        `Cannot submit draft - missing required fields: ${missingFields.join(', ')}`
+      ));
+    }
+
+    // Run auto moderation
+    const moderationResult = await checkProductModeration({
+      title: product.title,
+      short_description: product.short_description,
+      detailed_description: product.detailed_description || '',
+      tags: product.tags,
+      category: product.category,
+      brand: product.brand || undefined,
+    });
+
+    // Determine new status
+    let newStatus: 'active' | 'pending' | 'rejected' = 'pending';
+    let rejectionReason: string | null = null;
+    let isAutoModerated = false;
+
+    if (moderationResult.shouldReject) {
+      newStatus = 'rejected';
+      rejectionReason = moderationResult.reasons.join(', ');
+      isAutoModerated = true;
+    } else if (moderationResult.shouldApprove) {
+      newStatus = 'active';
+      isAutoModerated = true;
+    }
+
+    // Update product
+    const updatedProduct = await prisma.products.update({
+      where: { id: productId },
+      data: {
+        status: newStatus,
+        submittedAt: new Date(),
+        isAutoModerated,
+        moderationScore: moderationResult.moderationScore,
+        rejectionReason,
+      },
+      include: { images: true }
+    });
+
+    // Create history entry
+    await prisma.product_history.create({
+      data: {
+        productId: updatedProduct.id,
+        changedBy: req.seller.id,
+        changeType: isAutoModerated ? 'auto_moderation' : 'edit',
+        changes: {
+          action: 'draft_submitted',
+          oldStatus: 'draft',
+          newStatus,
+          moderationScore: moderationResult.moderationScore,
+          autoModerated: isAutoModerated,
+        },
+        reason: rejectionReason,
+      },
+    });
+
+    // Send notification to admin if needs manual review
+    if (newStatus === 'pending') {
+      await broadcastNotificationToAdmins({
+        title: "🔍 Draft Product Submitted for Review",
+        message: `Seller ${req.seller.name || req.seller.email} submitted draft product "${product.title}" for review.`,
+        creatorId: req.seller.id,
+        redirect_link: `/dashboard/moderation/pending-products`,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      product: updatedProduct,
+      moderationResult: {
+        status: newStatus,
+        isAutoModerated,
+        moderationScore: moderationResult.moderationScore,
+        message: newStatus === 'active' 
+          ? 'Product auto-approved and is now live!' 
+          : newStatus === 'rejected'
+          ? 'Product auto-rejected. Please review and fix issues.'
+          : 'Product submitted for manual review.'
+      }
+    });
+  } catch (error) {
+    console.error("❌ [ERROR] Submit Draft Failed:", error);
+    return next(error);
+  }
+};
+
+// Get product history
+export const getProductHistory = async (req: any, res: Response, next: NextFunction) => {
+  try {
+    const { productId } = req.params;
+
+    if (!productId) {
+      return next(new ValidationError("Product ID is required"));
+    }
+
+    // Find the product and verify ownership (for sellers) or allow for admins
+    const product = await prisma.products.findUnique({
+      where: { id: productId },
+      include: { shops: { include: { sellers: true } } }
+    });
+
+    if (!product) {
+      return next(new NotFoundError("Product not found"));
+    }
+
+    // Check permissions
+    const isSeller = req.seller?.id === product.shops?.sellers?.id;
+    const isAdmin = req.admin || req.user?.role === 'admin';
+
+    if (!isSeller && !isAdmin) {
+      return next(new AuthError("You don't have permission to view this product's history"));
+    }
+
+    // Fetch product history
+    const history = await prisma.product_history.findMany({
+      where: { productId },
+      orderBy: { createdAt: 'desc' },
+      take: 50 // Limit to last 50 entries
+    });
+
+    // Enrich history with user information
+    const enrichedHistory = await Promise.all(
+      history.map(async (entry) => {
+        let changedByName = 'System';
+        
+        // Try to get seller name
+        if (entry.changedBy) {
+          const seller = await prisma.sellers.findUnique({
+            where: { id: entry.changedBy },
+            select: { name: true, email: true }
+          });
+          
+          if (seller) {
+            changedByName = seller.name || seller.email;
+          } else {
+            // Try admin
+            const admin = await prisma.admins.findUnique({
+              where: { id: entry.changedBy },
+              select: { name: true, email: true }
+            });
+            
+            if (admin) {
+              changedByName = `Admin: ${admin.name || admin.email}`;
+            }
+          }
+        }
+
+        return {
+          ...entry,
+          changedByName
+        };
+      })
+    );
+
+    res.status(200).json({
+      success: true,
+      history: enrichedHistory,
+      product: {
+        id: product.id,
+        title: product.title,
+        status: product.status
+      }
+    });
+  } catch (error) {
+    console.error("❌ [ERROR] Get Product History Failed:", error);
     return next(error);
   }
 };

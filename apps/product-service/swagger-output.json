@@ -1,0 +1,634 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Product Service API",
+    "description": "API documentation for Product Service - Product management, moderation, and draft functionality",
+    "version": "1.0.0"
+  },
+  "host": "localhost:6002",
+  "basePath": "/",
+  "tags": [
+    {
+      "name": "Product",
+      "description": "Product management endpoints"
+    },
+    {
+      "name": "Draft",
+      "description": "Draft product endpoints"
+    },
+    {
+      "name": "History",
+      "description": "Product history endpoints"
+    }
+  ],
+  "schemes": [
+    "http"
+  ],
+  "paths": {
+    "/get-categories": {
+      "get": {
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/upload-product-image": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "fileData": {
+                  "example": "any"
+                },
+                "originalFileName": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        }
+      }
+    },
+    "/delete-product-image": {
+      "delete": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "fileId": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/create-product": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "starting_date": {
+                  "example": "any"
+                },
+                "ending_date": {
+                  "example": "any"
+                },
+                "images": {
+                  "example": "any"
+                },
+                "isDraft": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/update-product/{productId}": {
+      "put": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "productId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "starting_date": {
+                  "example": "any"
+                },
+                "ending_date": {
+                  "example": "any"
+                },
+                "images": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/submit-draft/{productId}": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "productId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/get-shop-products": {
+      "get": {
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/product-history/{productId}": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "productId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/delete-product/{productId}": {
+      "delete": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "productId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/restore-deleted-product/{productId}": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "productId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          }
+        }
+      }
+    },
+    "/get-all-products": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "string"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string"
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "type": "string"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "type": "string"
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/get-all-events": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/get-product/{slug}": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/get-filtered-products": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "priceRange",
+            "in": "query",
+            "type": "string"
+          },
+          {
+            "name": "categories",
+            "in": "query",
+            "type": "string"
+          },
+          {
+            "name": "colors",
+            "in": "query",
+            "type": "string"
+          },
+          {
+            "name": "sizes",
+            "in": "query",
+            "type": "string"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/get-filtered-shops": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "categories",
+            "in": "query",
+            "type": "string"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/search-products": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/top-shops": {
+      "get": {
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/get-shop/{id}": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/get-shop-products/{shopId}": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "shopId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "Product": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "example": "product_id"
+        },
+        "sellerId": {
+          "type": "string",
+          "example": "seller_id"
+        },
+        "name": {
+          "type": "string",
+          "example": "Product Name"
+        },
+        "description": {
+          "type": "string",
+          "example": "Product Description"
+        },
+        "price": {
+          "type": "number",
+          "example": 99.99
+        },
+        "category": {
+          "type": "string",
+          "example": "Electronics"
+        },
+        "stock": {
+          "type": "number",
+          "example": 100
+        },
+        "images": {
+          "type": "array",
+          "example": [
+            "image1.jpg",
+            "image2.jpg"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "status": {
+          "type": "string",
+          "example": "pending"
+        },
+        "moderationStatus": {
+          "type": "string",
+          "example": "pending"
+        },
+        "isDraft": {
+          "type": "boolean",
+          "example": false
+        },
+        "createdAt": {
+          "type": "string",
+          "example": "2024-01-01T00:00:00.000Z"
+        },
+        "updatedAt": {
+          "type": "string",
+          "example": "2024-01-01T00:00:00.000Z"
+        }
+      }
+    },
+    "DraftProduct": {
+      "type": "object",
+      "properties": {
+        "sellerId": {
+          "type": "string",
+          "example": "seller_id"
+        },
+        "name": {
+          "type": "string",
+          "example": "Product Name"
+        },
+        "description": {
+          "type": "string",
+          "example": "Product Description"
+        },
+        "price": {
+          "type": "number",
+          "example": 99.99
+        },
+        "category": {
+          "type": "string",
+          "example": "Electronics"
+        },
+        "stock": {
+          "type": "number",
+          "example": 100
+        },
+        "images": {
+          "type": "array",
+          "example": [
+            "image1.jpg",
+            "image2.jpg"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "isDraft": {
+          "type": "boolean",
+          "example": true
+        }
+      }
+    },
+    "SubmitDraftRequest": {
+      "type": "object",
+      "properties": {
+        "productId": {
+          "type": "string",
+          "example": "product_id"
+        }
+      }
+    },
+    "ProductHistory": {
+      "type": "object",
+      "properties": {
+        "productId": {
+          "type": "string",
+          "example": "product_id"
+        },
+        "history": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "example": "created"
+              },
+              "timestamp": {
+                "type": "string",
+                "example": "2024-01-01T00:00:00.000Z"
+              },
+              "moderatorId": {
+                "type": "string",
+                "example": "admin_id"
+              },
+              "reason": {
+                "type": "string",
+                "example": "Initial creation"
+              },
+              "changes": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -79,7 +79,6 @@ const CartSummary: React.FC<CartSummaryProps> = ({
   const shippingFee = subtotal >= freeShippingThreshold ? 0 : 5
   const amountUntilFreeShipping = Math.max(0, freeShippingThreshold - subtotal)
   
-  // Discount (mockup - can be implemented later)
   const discount = promoApplied ? subtotal * 0.1 : 0 // 10% discount
   
   const total = subtotal + shippingFee - discount

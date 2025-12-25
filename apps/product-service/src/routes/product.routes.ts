@@ -1,6 +1,6 @@
 import express, { Router } from 'express';
-import { createProduct, deleteProductImages, getCategories, getShopProducts, uploadProductImages, deleteProduct, restoreDeletedProduct, getAllProducts, getProductDetails, getFilteredProducts, getFilteredShops, searchProducts, topShops, getAllEvents, updateProduct, getShopById, getPublicShopProducts } from '../controller/product.controller';
-import { isAuthenticated, isSeller } from '@packages/middleware/isAuthenticated';
+import { createProduct, deleteProductImages, getCategories, getShopProducts, uploadProductImages, deleteProduct, restoreDeletedProduct, getAllProducts, getProductDetails, getFilteredProducts, getFilteredShops, searchProducts, topShops, getAllEvents, updateProduct, getShopById, getPublicShopProducts, submitDraftForReview, getProductHistory } from '../controller/product.controller';
+import { isAuthenticated, isSeller, isAdmin } from '@packages/middleware/isAuthenticated';
 const router: Router = express.Router();
 
 // Route to get product categories
@@ -10,7 +10,9 @@ router.post('/upload-product-image', isAuthenticated, isSeller, uploadProductIma
 router.delete('/delete-product-image', isAuthenticated, isSeller, deleteProductImages);
 router.post('/create-product', isAuthenticated, isSeller, createProduct);
 router.put('/update-product/:productId', isAuthenticated, isSeller, updateProduct);
+router.post('/submit-draft/:productId', isAuthenticated, isSeller, submitDraftForReview);
 router.get('/get-shop-products', isAuthenticated, isSeller, getShopProducts);
+router.get('/product-history/:productId', isAuthenticated, getProductHistory);
 router.delete('/delete-product/:productId', isAuthenticated, isSeller, deleteProduct);
 router.post('/restore-deleted-product/:productId', isAuthenticated, isSeller, restoreDeletedProduct); 
 

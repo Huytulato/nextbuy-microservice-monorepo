@@ -1,5 +1,5 @@
 import express, { Router } from 'express';
-import { getAllEvents, getAllAdmins, getAllProducts, addNewAdmin, fetchAllCustomizations, getAllSellers, getAllUsers, approveSeller, rejectSeller, approveProduct, rejectProduct, getPendingSellers, getPendingProducts } from '../controllers/admin.controller';
+import { getAllEvents, getAllAdmins, getAllProducts, addNewAdmin, fetchAllCustomizations, getAllSellers, getAllUsers, approveSeller, rejectSeller, approveProduct, rejectProduct, getPendingSellers, getPendingProducts, getModerationConfig, updateModerationConfig, addBannedKeyword, removeBannedKeyword, addSensitiveCategory, removeSensitiveCategory, bulkApproveProducts, bulkRejectProducts, getModerationAnalytics } from '../controllers/admin.controller';
 import { isAuthenticated, isAdmin } from '@packages/middleware/isAuthenticated';
 
 const router: Router = express.Router();
@@ -21,5 +21,16 @@ router.post("/reject-seller/:sellerId",isAuthenticated, isAdmin, rejectSeller);
 router.get("/get-pending-products",isAuthenticated, isAdmin, getPendingProducts);
 router.post("/approve-product/:productId",isAuthenticated, isAdmin, approveProduct);
 router.post("/reject-product/:productId",isAuthenticated, isAdmin, rejectProduct);
+router.post("/bulk-approve-products",isAuthenticated, isAdmin, bulkApproveProducts);
+router.post("/bulk-reject-products",isAuthenticated, isAdmin, bulkRejectProducts);
+router.get("/moderation-analytics",isAuthenticated, isAdmin, getModerationAnalytics);
+
+// Moderation configuration routes
+router.get("/moderation-config",isAuthenticated, isAdmin, getModerationConfig);
+router.put("/moderation-config",isAuthenticated, isAdmin, updateModerationConfig);
+router.post("/moderation-config/banned-keywords",isAuthenticated, isAdmin, addBannedKeyword);
+router.delete("/moderation-config/banned-keywords",isAuthenticated, isAdmin, removeBannedKeyword);
+router.post("/moderation-config/sensitive-categories",isAuthenticated, isAdmin, addSensitiveCategory);
+router.delete("/moderation-config/sensitive-categories",isAuthenticated, isAdmin, removeSensitiveCategory);
 
 export default router;
