@@ -43,7 +43,7 @@ const SubmitDocuments = ({ sellerId, onSuccess, onSkip }: DocumentUploadProps) =
 
       const originalFileName = file.name || `document-${Date.now()}.${file.type.split('/')[1]}`;
       
-      const response = await axiosInstance.post('/product/api/upload-product-image', {
+      const response = await axiosInstance.post('/seller/api/upload-seller-document', {
         fileData,
         originalFileName,
       });
@@ -72,6 +72,7 @@ const SubmitDocuments = ({ sellerId, onSuccess, onSkip }: DocumentUploadProps) =
     mutationFn: async (documents: any) => {
       const response = await axiosInstance.post('/seller/api/submit-seller-documents', {
         documents,
+        sellerId, // Include sellerId in body for registration flow
       });
       return response.data;
     },

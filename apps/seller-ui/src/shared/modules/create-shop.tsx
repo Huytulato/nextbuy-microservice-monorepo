@@ -33,7 +33,13 @@ const CreateShop = ({
         website: data.shopWebsite || '',
         sellerId,
       };
-      const response = await axios.post(`${API_BASE}/seller/api/create-shop`, payload);
+      const response = await axios.post(
+        `${API_BASE}/seller/api/create-shop`, 
+        payload, 
+        {
+          withCredentials: true // Quan trọng nhất: Cho phép gửi Cookie
+        }
+      );
       return response.data;
     },
     onSuccess: () => {

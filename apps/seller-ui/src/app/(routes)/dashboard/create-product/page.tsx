@@ -4,14 +4,13 @@ import { ChevronRight, Home, Save, Package, ImageIcon, Folder, ChevronDown, X, W
 import React, { useMemo, useState, useEffect } from 'react'
 import { useForm, Controller } from 'react-hook-form';
 import Input from 'packages/components/input';
-import ColorSelector from 'packages/components/color-selector';
+import { VariationMatrix, VariationGroup, Variation } from 'packages/components/variation-matrix';
 import CustomSpecifications from 'packages/components/custom-specification';
 import CustomProperties from 'packages/components/custom-properties';
 import { useQuery } from '@tanstack/react-query';
 import axiosInstance from 'apps/seller-ui/src/utils/axiosInstance';
 import axios from 'axios';
 import RichTextEditor from 'packages/components/rich-text-editor';
-import SizeSelector from 'packages/components/size-selector';
 import { enhancements } from 'apps/seller-ui/src/utils/AI.enhancements';
 import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -30,7 +29,6 @@ const DashboardPage = () => {
   const { register, handleSubmit, formState: { errors }, watch, setValue, control, reset } = useForm();
 
   const [openImageModal, setOpenImageModal] = useState(false);
-  const [isChanged, setIsChanged] = useState(true);
   const [activeEffect, setActiveEffect] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState('');
   const [originalImageUrl, setOriginalImageUrl] = useState(''); // Store original URL before enhancement
@@ -41,8 +39,11 @@ const DashboardPage = () => {
   const [loading, setLoading] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
 
-  // This setter will be used once we add draft/change tracking.
-  void setIsChanged;
+  // Variation State
+  const [variationGroups, setVariationGroups] = useState<VariationGroup[]>([]);
+  const [variations, setVariations] = useState<Variation[]>([]);
+
+  // Refs for scrolling
 
   // Fetch product data if editing
   const { data: productData, isLoading: productLoading } = useQuery({
@@ -74,8 +75,6 @@ const DashboardPage = () => {
         video_url: productData.video_url || '',
         category: productData.category || '',
         subCategory: productData.subCategory || '',
-        color: productData.colors || [],
-        sizes: productData.sizes || [],
         custom_specifications: productData.custom_specifications || [],
         custom_properties: productData.custom_properties || {},
         discount_codes: productData.discount_codes || [],
@@ -88,6 +87,21 @@ const DashboardPage = () => {
           file_url: img.url,
         }));
         setImages(formattedImages);
+      }
+
+      // Populate variations
+      if (productData.variationGroups) {
+        setVariationGroups(productData.variationGroups);
+      } else if (productData.colors || productData.sizes) {
+        // Legacy support: convert colors/sizes to groups
+        const groups: VariationGroup[] = [];
+        if (productData.colors?.length) groups.push({ name: 'Color', options: productData.colors });
+        if (productData.sizes?.length) groups.push({ name: 'Size', options: productData.sizes });
+        setVariationGroups(groups);
+      }
+
+      if (productData.variations) {
+        setVariations(productData.variations);
       }
     }
   }, [productData, editProductId, reset]);
@@ -130,13 +144,19 @@ const DashboardPage = () => {
   const onSubmit = async (data: any) => {
     try {
       setLoading(true);
+      const payload = {
+        ...data,
+        variationGroups,
+        variations,
+      };
+
       if (editProductId) {
         // Update existing product
-        await axiosInstance.put(`/product/api/update-product/${editProductId}`, data);
+        await axiosInstance.put(`/product/api/update-product/${editProductId}`, payload);
         toast.success('Product updated successfully!');
       } else {
         // Create new product
-        await axiosInstance.post('/product/api/create-product', data);
+        await axiosInstance.post('/product/api/create-product', payload);
         toast.success('Product created successfully!');
       }
       router.push('/dashboard/all-products');
@@ -151,7 +171,12 @@ const DashboardPage = () => {
     try {
       setLoading(true);
       const formData = watch(); // Get current form data
-      const draftData = { ...formData, isDraft: true };
+      const draftData = { 
+        ...formData, 
+        isDraft: true,
+        variationGroups,
+        variations,
+      };
       
       if (editProductId) {
         // Update existing product as draft
@@ -382,12 +407,89 @@ const DashboardPage = () => {
         </div>
 
         {/* --- MAIN LAYOUT --- */}
-        <div className="flex flex-col lg:flex-row gap-8">
-          
-          {/* LEFT COLUMN (MAIN CONTENT - 66%) */}
-          <div className="lg:w-2/3 space-y-6">
+        <div className="max-w-5xl mx-auto space-y-6">
 
-            {/* 1. Basic Information Card */}
+            {/* 1. Category Selection Card */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+              <h3 className="font-semibold text-gray-800 mb-5 pb-3 border-b border-gray-100 flex items-center gap-2">
+                <div className="w-1 h-5 bg-violet-500 rounded-full"></div>
+                <Folder size={18} className="text-violet-500" />
+                Category Organization
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {/* Main Category */}
+                <div>
+                  <label className="block font-semibold mb-2 text-gray-700 text-sm">Category *</label>
+                  <div className="relative">
+                    <Controller
+                      name="category"
+                      control={control}
+                      rules={{ required: "Category is required" }}
+                      render={({ field }) => (
+                        <select
+                          {...field}
+                          className="w-full border outline-none px-3 py-2.5 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500 bg-white appearance-none cursor-pointer text-gray-700 transition-all hover:border-violet-300"
+                          disabled={categoriesLoading}
+                        >
+                          <option value="">{categoriesLoading ? 'Loading...' : 'Select category'}</option>
+                          {categories?.map((category: string) => (
+                            <option key={category} value={category}>{category}</option>
+                          ))}
+                        </select>
+                      )}
+                    />
+                    <ChevronDown size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  </div>
+                  {errors.category && <p className="text-red-500 text-sm mt-1">{errors.category.message as string}</p>}
+                </div>
+
+                {/* Subcategory */}
+                <div>
+                  <label className="block font-semibold mb-2 text-gray-700 text-sm">Subcategory</label>
+                  <div className="relative">
+                    <Controller
+                      name="subCategory"
+                      control={control}
+                      render={({ field }) => (
+                        <select
+                          {...field}
+                          className="w-full border outline-none px-3 py-2.5 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500 bg-white appearance-none cursor-pointer text-gray-700 transition-all hover:border-violet-300 disabled:bg-gray-50 disabled:cursor-not-allowed"
+                          disabled={!selectedCategory || categoriesLoading || subcategories.length === 0}
+                        >
+                          <option value="">
+                            {!selectedCategory 
+                              ? 'Select category first' 
+                              : subcategories.length === 0 
+                                ? 'No subcategories available' 
+                                : 'Select subcategory'}
+                          </option>
+                          {subcategories?.map((sub: string, index: number) => (
+                            <option key={index} value={sub}>{sub}</option>
+                          ))}
+                        </select>
+                      )}
+                    />
+                    <ChevronDown size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* Category Preview */}
+                {selectedCategory && (
+                  <div className="md:col-span-2 p-3 bg-violet-50 rounded-lg border border-violet-100">
+                    <p className="text-xs text-violet-700">
+                      <span className="font-medium">Path: </span>
+                      {selectedCategory}
+                      {watch('subCategory') && (
+                        <span> / {watch('subCategory')}</span>
+                      )}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 2. Basic Information Card */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
               <h3 className="font-semibold text-gray-800 mb-5 pb-3 border-b border-gray-100 flex items-center gap-2">
                 <div className="w-1 h-5 bg-indigo-500 rounded-full"></div>
@@ -472,7 +574,73 @@ const DashboardPage = () => {
               </div>
             </div>
 
-            {/* 2. Detailed Description Card */}
+
+
+            {/* 3. Pricing & Inventory Card */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+              <h3 className="font-semibold text-gray-800 mb-5 pb-3 border-b border-gray-100 flex items-center gap-2">
+                <div className="w-1 h-5 bg-green-500 rounded-full"></div>
+                <DollarSign size={18} className="text-green-500" />
+                Pricing & Inventory
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div>
+                  <input
+                    placeholder="$0.00"
+                    {...register('regular_price', {
+                      valueAsNumber: true,
+                      required: "Regular price is required",
+                      min: { value: 0, message: "Price cannot be negative" },
+                      validate: (value) => !isNaN(value) || "Please enter a valid number",
+                    })}
+                    className="w-full border outline-none px-3 py-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-700 transition-all hover:border-indigo-300"
+                  />
+                  <span className="text-xs text-gray-500 mt-1 block">Regular Price *</span>
+                  {errors.regular_price && <p className="text-red-500 text-sm mt-1">{errors.regular_price.message as string}</p>}
+                </div>
+
+                <div>
+                  <input
+                    placeholder="$0.00"
+                    {...register('sale_price', {
+                      valueAsNumber: true,
+                      required: "Sale price is required",
+                      min: { value: 0, message: "Price cannot be negative" },
+                      validate: (value) => {
+                        if (isNaN(value)) return "Please enter a valid number";
+                        if (regularPrice && value >= regularPrice) return "Sale price must be less than regular price";
+                        return true;
+                      }
+                    })}
+                    className="w-full border outline-none px-3 py-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-700 transition-all hover:border-indigo-300"
+                  />
+                  <span className="text-xs text-gray-500 mt-1 block">Sale Price *</span>
+                  {errors.sale_price && <p className="text-red-500 text-sm mt-1">{errors.sale_price.message as string}</p>}
+                </div>
+
+                <div>
+                  <input
+                    placeholder="e.g. 100"
+                    {...register('stock', {
+                      valueAsNumber: true,
+                      required: "Stock quantity is required",
+                      min: { value: 1, message: "Quantity must be at least 1" },
+                      max: { value: 10000, message: "Quantity cannot exceed 10,000" },
+                      validate: (value) => {
+                        if (isNaN(value)) return "Please enter a valid number";
+                        if (!Number.isInteger(value)) return "Quantity must be an integer";
+                        return true;
+                      }
+                    })}
+                    className="w-full border outline-none px-3 py-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-700 transition-all hover:border-indigo-300"
+                  />
+                  <span className="text-xs text-gray-500 mt-1 block">Stock Quantity *</span>
+                  {errors.stock && <p className="text-red-500 text-sm mt-1">{errors.stock.message as string}</p>}
+                </div>
+              </div>
+            </div>
+
+            {/* 4. Detailed Description Card */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                <h3 className="font-semibold text-gray-800 mb-4 pb-3 border-b border-gray-100 flex items-center gap-2">
                   <div className="w-1 h-5 bg-blue-500 rounded-full"></div>
@@ -497,7 +665,7 @@ const DashboardPage = () => {
               </div>
             </div>
 
-            {/* 3. Product Images Card */}
+            {/* 5. Product Images Card */}
              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                 <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
                   <div className="w-1 h-5 bg-rose-500 rounded-full"></div>
@@ -554,7 +722,7 @@ const DashboardPage = () => {
                 </p>
             </div>
 
-            {/* 4. Specifications Card */}
+            {/* 6. Specifications Card */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
               <h3 className="font-semibold text-gray-800 mb-5 pb-3 border-b border-gray-100 flex items-center gap-2">
                 <div className="w-1 h-5 bg-emerald-500 rounded-full"></div>
@@ -566,7 +734,7 @@ const DashboardPage = () => {
               />
             </div>
 
-            {/* 5. Custom Properties Card */}
+            {/* 7. Custom Properties Card */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
               <h3 className="font-semibold text-gray-800 mb-5 pb-3 border-b border-gray-100 flex items-center gap-2">
                 <div className="w-1 h-5 bg-amber-500 rounded-full"></div>
@@ -578,216 +746,27 @@ const DashboardPage = () => {
               />
             </div>
 
-          </div>
-
-          {/* RIGHT COLUMN (SIDEBAR - 33%) */}
-          <div className="lg:w-1/3 space-y-6">
-
-             {/* 1. Action Buttons (Sticky Top of Sidebar) */}
-             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 sticky top-6 z-10">
-                 <h3 className="font-semibold text-gray-800 mb-4">
-                   {editProductId ? 'Update' : 'Publish'}
-                 </h3>
-                 <div className="flex flex-col gap-3">
-                    <button
-                      type="submit"
-                      disabled={loading || productLoading}
-                      className="w-full flex justify-center items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg transition-all font-medium shadow-lg shadow-indigo-200 disabled:opacity-50"
-                    >
-                      <Save size={18} />
-                      {loading ? 'Saving...' : editProductId ? 'Update Product' : 'Save & Publish'}
-                    </button>
-                    {/* Show Save Draft button for new products or when editing drafts */}
-                    {(!editProductId || productData?.status === 'draft') && (
-                      <button
-                        type="button"
-                        onClick={handleSaveDraft}
-                        disabled={loading}
-                        className="w-full flex justify-center items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-all font-medium shadow-sm disabled:opacity-50"
-                      >
-                        <Save size={18} />
-                        Save Draft
-                      </button>
-                    )}
-                    {/* Show Submit Draft button only when editing a draft */}
-                    {editProductId && productData?.status === 'draft' && (
-                      <button
-                        type="button"
-                        onClick={() => handleSubmitDraft(editProductId)}
-                        disabled={loading}
-                        className="w-full flex justify-center items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg transition-all font-medium shadow-lg shadow-green-200 disabled:opacity-50"
-                      >
-                        <Package size={18} />
-                        Submit for Review
-                      </button>
-                    )}
-                 </div>
-             </div>
-
-            {/* 2. Category Selection Card */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-              <h3 className="font-semibold text-gray-800 mb-5 pb-3 border-b border-gray-100 flex items-center gap-2">
-                <div className="w-1 h-5 bg-violet-500 rounded-full"></div>
-                <Folder size={18} className="text-violet-500" />
-                Category Organization
-              </h3>
-
-              <div className="flex flex-col gap-5">
-                {/* Main Category */}
-                <div>
-                  <label className="block font-semibold mb-2 text-gray-700 text-sm">Category *</label>
-                  <div className="relative">
-                    <Controller
-                      name="category"
-                      control={control}
-                      rules={{ required: "Category is required" }}
-                      render={({ field }) => (
-                        <select
-                          {...field}
-                          className="w-full border outline-none px-3 py-2.5 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500 bg-white appearance-none cursor-pointer text-gray-700 transition-all hover:border-violet-300"
-                          disabled={categoriesLoading}
-                        >
-                          <option value="">{categoriesLoading ? 'Loading...' : 'Select category'}</option>
-                          {categories?.map((category: string) => (
-                            <option key={category} value={category}>{category}</option>
-                          ))}
-                        </select>
-                      )}
-                    />
-                    <ChevronDown size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                  </div>
-                  {errors.category && <p className="text-red-500 text-sm mt-1">{errors.category.message as string}</p>}
-                </div>
-
-                {/* Subcategory */}
-                <div>
-                  <label className="block font-semibold mb-2 text-gray-700 text-sm">Subcategory</label>
-                  <div className="relative">
-                    <Controller
-                      name="subCategory"
-                      control={control}
-                      render={({ field }) => (
-                        <select
-                          {...field}
-                          className="w-full border outline-none px-3 py-2.5 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500 bg-white appearance-none cursor-pointer text-gray-700 transition-all hover:border-violet-300 disabled:bg-gray-50 disabled:cursor-not-allowed"
-                          disabled={!selectedCategory || categoriesLoading || subcategories.length === 0}
-                        >
-                          <option value="">
-                            {!selectedCategory 
-                              ? 'Select category first' 
-                              : subcategories.length === 0 
-                                ? 'No subcategories available' 
-                                : 'Select subcategory'}
-                          </option>
-                          {subcategories?.map((sub: string, index: number) => (
-                            <option key={index} value={sub}>{sub}</option>
-                          ))}
-                        </select>
-                      )}
-                    />
-                    <ChevronDown size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                  </div>
-                </div>
-
-                {/* Category Preview */}
-                {selectedCategory && (
-                  <div className="p-3 bg-violet-50 rounded-lg border border-violet-100">
-                    <p className="text-xs text-violet-700">
-                      <span className="font-medium">Path: </span>
-                      {selectedCategory}
-                      {watch('subCategory') && (
-                        <span> / {watch('subCategory')}</span>
-                      )}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* 3. Pricing & Inventory Card (GROUPED) */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                 <h3 className="font-semibold text-gray-800 mb-5 pb-3 border-b border-gray-100 flex items-center gap-2">
-                    <div className="w-1 h-5 bg-green-500 rounded-full"></div>
-                    <DollarSign size={18} className="text-green-500" />
-                    Pricing & Inventory
-                  </h3>
-                  <div className="space-y-4">
-                     <div>
-                        <input
-                          placeholder="$0.00"
-                          {...register('regular_price', {
-                            valueAsNumber: true,
-                            required: "Regular price is required",
-                            min: { value: 0, message: "Price cannot be negative" },
-                            validate: (value) => !isNaN(value) || "Please enter a valid number",
-                          })}
-                          className="w-full border outline-none px-3 py-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-700 transition-all hover:border-indigo-300"
-                        />
-                        <span className="text-xs text-gray-500 mt-1 block">Regular Price</span>
-                        {errors.regular_price && <p className="text-red-500 text-sm mt-1">{errors.regular_price.message as string}</p>}
-                     </div>
-
-                     <div>
-                        <input
-                          placeholder="$0.00"
-                          {...register('sale_price', {
-                            valueAsNumber: true,
-                            required: "Sale price is required",
-                            min: { value: 0, message: "Price cannot be negative" },
-                            validate: (value) => {
-                              if (isNaN(value)) return "Please enter a valid number";
-                              if (regularPrice && value >= regularPrice) return "Sale price must be less than regular price";
-                              return true;
-                            }
-                          })}
-                          className="w-full border outline-none px-3 py-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-700 transition-all hover:border-indigo-300"
-                        />
-                         <span className="text-xs text-gray-500 mt-1 block">Sale Price</span>
-                        {errors.sale_price && <p className="text-red-500 text-sm mt-1">{errors.sale_price.message as string}</p>}
-                     </div>
-
-                     <div className="pt-2 border-t border-gray-100">
-                        <input
-                          placeholder="e.g. 100"
-                          {...register('stock', {
-                            valueAsNumber: true,
-                            required: "Stock quantity is required",
-                            min: { value: 1, message: "Quantity must be at least 1" },
-                            max: { value: 10000, message: "Quantity cannot exceed 10,000" },
-                            validate: (value) => {
-                              if (isNaN(value)) return "Please enter a valid number";
-                              if (!Number.isInteger(value)) return "Quantity must be an integer";
-                              return true;
-                            }
-                          })}
-                          className="w-full border outline-none px-3 py-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-700 transition-all hover:border-indigo-300"
-                        />
-                        <span className="text-xs text-gray-500 mt-1 block">Stock Quantity</span>
-                        {errors.stock && <p className="text-red-500 text-sm mt-1">{errors.stock.message as string}</p>}
-                     </div>
-                  </div>
-            </div>
-
-            {/* 4. Variants (Color & Size) */}
+            {/* 8. Product Variations */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
               <h3 className="font-semibold text-gray-800 mb-5 pb-3 border-b border-gray-100 flex items-center gap-2">
                 <div className="w-1 h-5 bg-pink-500 rounded-full"></div>
                 <Layers size={18} className="text-pink-500" />
-                Variants
+                Product Variations
               </h3>
               
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Colors</label>
-                <ColorSelector control={control} errors={errors} />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Sizes</label>
-                <SizeSelector control={control} errors={errors} />
-              </div>
+              <VariationMatrix
+                groups={variationGroups}
+                variations={variations}
+                basePrice={watch('sale_price') || watch('regular_price') || 0}
+                baseStock={watch('stock') || 0}
+                onChange={(data) => {
+                  setVariationGroups(data.groups);
+                  setVariations(data.variations);
+                }}
+              />
             </div>
 
-            {/* 5. Extras (Video & Discounts) */}
+            {/* 9. Extras (Video & Discounts) */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                <h3 className="font-semibold text-gray-800 mb-5 pb-3 border-b border-gray-100 flex items-center gap-2">
                   <div className="w-1 h-5 bg-gray-500 rounded-full"></div>
@@ -795,7 +774,7 @@ const DashboardPage = () => {
                </h3>
                
                {/* Video URL */}
-               <div className="mb-4">
+               <div className="mb-6">
                   <div className="flex items-center gap-2 mb-2">
                       <Video size={16} className="text-gray-500"/>
                       <label className="text-sm font-medium text-gray-700">Video URL</label>
@@ -848,9 +827,45 @@ const DashboardPage = () => {
                   )}
                </div>
             </div>
-
-          </div> {/* End Right Column */}
-        </div> {/* End Main Flex Layout */}
+          {/* Action Buttons (Footer of Page) */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <h3 className="font-semibold text-gray-800 mb-4">
+              {editProductId ? 'Update' : 'Publish'}
+            </h3>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                type="submit"
+                disabled={loading || productLoading}
+                className="flex-1 flex justify-center items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg transition-all font-medium shadow-lg shadow-indigo-200 disabled:opacity-50"
+              >
+                <Save size={18} />
+                {loading ? 'Saving...' : editProductId ? 'Update Product' : 'Save & Publish'}
+              </button>
+              {(!editProductId || productData?.status === 'draft') && (
+                <button
+                  type="button"
+                  onClick={handleSaveDraft}
+                  disabled={loading}
+                  className="flex-1 flex justify-center items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-all font-medium shadow-sm disabled:opacity-50"
+                >
+                  <Save size={18} />
+                  Save Draft
+                </button>
+              )}
+              {editProductId && productData?.status === 'draft' && (
+                <button
+                  type="button"
+                  onClick={() => handleSubmitDraft(editProductId)}
+                  disabled={loading}
+                  className="flex-1 flex justify-center items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg transition-all font-medium shadow-lg shadow-green-200 disabled:opacity-50"
+                >
+                  <Package size={18} />
+                  Submit for Review
+                </button>
+              )}
+            </div>
+          </div>
+        </div> {/* End Main Layout */}
 
         {/* --- MODAL Enhance Product Image --- */}
         {openImageModal && (

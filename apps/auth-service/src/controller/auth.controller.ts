@@ -362,7 +362,7 @@ export const loginSeller = async (req:Request,res:Response,next:NextFunction) =>
 export const getSeller = async (req:any,res:Response,next:NextFunction) => {
   try {
     const seller = req.seller;
-    res.status(201).json({
+    res.status(200).json({
       success: true,
       seller,
     });

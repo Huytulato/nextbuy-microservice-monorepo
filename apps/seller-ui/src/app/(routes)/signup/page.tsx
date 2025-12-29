@@ -12,6 +12,7 @@ import SubmitDocuments from '../../../shared/modules/submit-documents';
 import { countries } from '../../../utils/countries';
 import StripeLogo from 'apps/seller-ui/src/assets/svgs/stripe-logo';
 import useSeller from '../../../hooks/useSeller';
+import axiosInstance from '../../../utils/axiosInstance';
 
 
 
@@ -228,7 +229,7 @@ const Signup = () => {
 
     const connectStripe = async () => {
         try {
-            const response = await axios.post(`${API_BASE}/seller/api/create-stripe-account`, 
+            const response = await axiosInstance.post('/seller/api/create-stripe-account', 
             {sellerId});
             if (response.data.url){
                 window.location.href = response.data.url;

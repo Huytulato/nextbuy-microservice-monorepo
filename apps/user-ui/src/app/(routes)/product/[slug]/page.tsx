@@ -77,6 +77,9 @@ const Page = async ({ params }: { params: Promise<{ slug: string }> }) => {
     sellerId: product.shops?.id,
     shopRating: product.shops?.rating || 0,
     shopAvatar: product.shops?.avatar,
+    hasVariations: product.hasVariations || false,
+    variations: product.variations || [],
+    variationGroups: product.variationGroups || [],
   };
 
   return (

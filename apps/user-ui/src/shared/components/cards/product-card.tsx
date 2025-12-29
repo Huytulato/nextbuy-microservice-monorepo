@@ -1,6 +1,7 @@
 'use client'
 import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Heart, ShoppingCart, Percent, Check, Truck, TrendingUp, Clock, Store } from 'lucide-react'
 import { Rating } from '../ratings'
 import { useStore } from '../../../store'
@@ -53,6 +54,7 @@ interface Product {
   updateAt: string | Date
   shopId: string
   shops?: ProductShop
+  hasVariations?: boolean
 }
 
 interface ProductCardProps {
@@ -72,6 +74,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   onAddToWishlist,
   priority = false
 }) => {
+  const router = useRouter()
   const [isHovered, setIsHovered] = useState(false)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [isAddingToCart, setIsAddingToCart] = useState(false)
@@ -145,6 +148,13 @@ const ProductCard: React.FC<ProductCardProps> = ({
     e.preventDefault()
     e.stopPropagation()
     if (!isInStock || !isSaleActive) return
+    
+    // If product has variations, redirect to product detail page
+    // User must select variation before adding to cart
+    if (product.hasVariations) {
+      router.push(`/product/${product.slug}`)
+      return
+    }
     
     setIsAddingToCart(true)
     

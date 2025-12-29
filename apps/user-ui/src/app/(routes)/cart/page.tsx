@@ -178,28 +178,29 @@ const CartPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gray-50/50 py-12">
       <div className="container mx-auto px-4 max-w-7xl">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-10">
           <Link
             href="/products"
-            className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors"
+            className="inline-flex items-center gap-2 text-gray-500 hover:text-blue-600 mb-6 transition-colors font-medium"
           >
             <ArrowLeft className="w-4 h-4" />
             Continue Shopping
           </Link>
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-              <ShoppingCart className="w-8 h-8" />
-              Shopping Cart
-              <span className="text-xl text-gray-500 font-normal">
-                ({cart.reduce((total: number, item: any) => total + (item.quantity || 1), 0)} items)
-              </span>
-            </h1>
+          <div className="flex items-end justify-between flex-wrap gap-4 border-b border-gray-200 pb-6">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3 mb-2">
+                Shopping Cart
+              </h1>
+              <p className="text-gray-500">
+                You have {cart.reduce((total: number, item: any) => total + (item.quantity || 1), 0)} items in your cart
+              </p>
+            </div>
             <button
               onClick={handleClearCart}
-              className="px-4 py-2 text-red-600 hover:text-red-700 font-medium transition-colors"
+              className="px-4 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg font-medium transition-all"
             >
               Clear Cart
             </button>
@@ -207,24 +208,27 @@ const CartPage = () => {
         </div>
 
         {/* Cart Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Cart Items */}
-          <div className="lg:col-span-2 space-y-4">
-            {cart.map((item: any) => (
+          <div className="lg:col-span-8 space-y-6">
+            {cart.map((item: any, index: number) => (
               <CartItem
-                key={item.id}
+                key={`${item.id}-${item.variationId || 'default'}-${index}`}
                 id={item.id}
                 title={item.title}
                 price={item.price}
                 image={item.image}
                 quantity={item.quantity || 1}
                 shopId={item.shopId}
+                variationId={item.variationId}
+                sku={item.sku}
+                variationName={item.variationName}
               />
             ))}
           </div>
 
           {/* Cart Summary */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-4 sticky top-4">
             <CartSummary 
               selectedAddressId={selectedAddressId}
               onAddressChange={setSelectedAddressId}

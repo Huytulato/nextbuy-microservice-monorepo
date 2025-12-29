@@ -28,6 +28,7 @@ export interface Shop {
   category: string;
   images: ShopImage[];
   coverBanner?: string;
+  avatar?: string;
   address: string;
   opening_hours: string;
   website?: string;

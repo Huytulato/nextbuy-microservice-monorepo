@@ -349,6 +349,7 @@ export const createOrder = async (
             items: {
               create: orderItems.map((item: any) => ({
                 productId: item.id,
+                variationId: item.variationId || null, // NEW: Link to specific variation
                 quantity: item.quantity,
                 price: item.sale_price,
                 selectedOptions: item.selectedOptions || [],
@@ -357,15 +358,45 @@ export const createOrder = async (
           },
         });
 
-        // Update product stock & analytics here if needed
+        // Update product/variation stock & analytics here if needed
         for (const item of orderItems) {
-          const { id: productId, quantity } = item;
-          await prisma.products.update({
-            where: { id: productId },
-            data: {
-              stock: { decrement: quantity },
-            },
-          });
+          const { id: productId, quantity, variationId } = item;
+          
+          if (variationId) {
+            // NEW: Update variation-specific stock and mark as having orders
+            const variation = await prisma.product_variations.findUnique({
+              where: { id: variationId },
+            });
+
+            if (variation) {
+              await prisma.product_variations.update({
+                where: { id: variationId },
+                data: {
+                  stock: { decrement: quantity },
+                  hasOrders: true, // Prevent hard delete
+                },
+              });
+
+              console.log(`✅ [ORDER] Updated variation ${variation.sku}: stock -${quantity}, hasOrders=true`);
+            } else {
+              console.warn(`⚠️ [ORDER] Variation ${variationId} not found, falling back to product stock`);
+              // Fallback to product-level stock if variation not found
+              await prisma.products.update({
+                where: { id: productId },
+                data: {
+                  stock: { decrement: quantity },
+                },
+              });
+            }
+          } else {
+            // Legacy: Update product-level stock
+            await prisma.products.update({
+              where: { id: productId },
+              data: {
+                stock: { decrement: quantity },
+              },
+            });
+          }
 
           await prisma.productAnalytics.upsert({
             where: { productId: productId },

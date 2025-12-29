@@ -77,16 +77,24 @@ export const isAuthenticated = async (req: AuthRequest, res: Response, next: Nex
  */
 export const isSeller = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    // Nếu đã được authenticate bởi isAuthenticated và là seller, skip verification
-    if (req.seller && req.role === "seller") {
+    // 1. Kiểm tra nếu isAuthenticated đã xác thực rồi
+    if (req.role === "seller" && req.seller) {
       return next();
     }
 
-    const token = req.cookies["seller-access-token"] || req.headers.authorization?.split(" ")[1];
-    if (!token) return res.status(401).json({ success: false, message: "Cần quyền Seller" });
+    // 2. Nếu chưa (hoặc gọi độc lập), lấy token linh hoạt hơn
+    const token = req.cookies["seller-access-token"] 
+               || req.cookies["accessToken"]  // Thêm dòng này
+               || req.headers.authorization?.split(" ")[1];
+
+    if (!token) {
+        return res.status(401).json({ success: false, message: "Cần quyền Seller (Không tìm thấy token)" });
+    }
 
     const result = await verifyAndLoadAccount(token, "seller");
-    if (!result) return res.status(403).json({ success: false, message: "Không có quyền Seller" });
+    if (!result) {
+        return res.status(403).json({ success: false, message: "Không có quyền Seller" });
+    }
 
     req.seller = result.account;
     req.role = result.role;

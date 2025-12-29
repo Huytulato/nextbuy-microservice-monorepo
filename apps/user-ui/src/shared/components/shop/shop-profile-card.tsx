@@ -12,7 +12,7 @@ interface ShopProfileCardProps {
 const ShopProfileCard: React.FC<ShopProfileCardProps> = ({ shop }) => {
   const [isFollowing, setIsFollowing] = useState(false);
 
-  const avatarUrl = shop.images?.[0]?.url || "https://ik.imagekit.io/nextbuy/avatar/images.png?updatedAt=1765397806718";
+  const avatarUrl = shop.avatar || shop.images?.[0]?.url || "https://ik.imagekit.io/nextbuy/avatar/images.png?updatedAt=1765397806718";
 
   const handleFollow = () => {
     // TODO: Implement follow functionality
@@ -59,14 +59,6 @@ const ShopProfileCard: React.FC<ShopProfileCardProps> = ({ shop }) => {
           <div className="flex items-center justify-center gap-2 text-sm text-gray-600 mb-4">
             <Clock className="w-4 h-4" />
             <span>{shop.opening_hours}</span>
-          </div>
-        )}
-
-        {/* Address */}
-        {shop.address && (
-          <div className="flex items-center justify-center gap-2 text-sm text-gray-600 mb-6">
-            <MapPin className="w-4 h-4" />
-            <span>{shop.address}</span>
           </div>
         )}
 

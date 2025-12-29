@@ -9,6 +9,9 @@ type Product = {
   image: string;
   quantity?: number;
   shopId: string;
+  variationId?: string; // NEW: Track specific variation
+  variationAttributes?: Record<string, string>; // NEW: Store selected attributes (e.g., {Color: "Red", Size: "M"})
+  sku?: string; // NEW: Store SKU for display
 };
 
 type Store = {
@@ -24,6 +27,7 @@ type Store = {
 
   removeFromCart: (
     id: string,
+    variationId: string | undefined, // NEW: Support variation-specific removal
     user: any,
     location: string,
     deviceInfo: string
@@ -31,6 +35,7 @@ type Store = {
 
   updateCartQuantity: (
     id: string,
+    variationId: string | undefined, // NEW: Support variation-specific quantity update
     quantity: number,
     user: any,
     location: string,
@@ -62,18 +67,23 @@ export const useStore = create<Store>()(
 
       addToCart: (product, user, location, deviceInfo) => {
         set((state) => {
-          const existingProduct = state.cart.find((item) => item.id === product.id);
+          // Find existing cart item by product ID AND variation ID (if exists)
+          const existingProduct = state.cart.find(
+            (item) => item.id === product.id && item.variationId === product.variationId
+          );
 
           if (existingProduct) {
+            // Increment quantity for existing item
             return {
               cart: state.cart.map((item) =>
-                item.id === product.id
+                item.id === product.id && item.variationId === product.variationId
                   ? { ...item, quantity: (item.quantity || 1) + 1 }
                   : item
               ),
             };
           }
 
+          // Add new cart item with variation info
           return {
             cart: [...state.cart, { ...product, quantity: product.quantity || 1 }],
           };
@@ -96,6 +106,9 @@ export const useStore = create<Store>()(
             metadata: {
               quantity: 1,
               price: product.price,
+              variationId: product.variationId,
+              sku: product.sku,
+              attributes: product.variationAttributes,
               ...getEventMetadata(),
             },
           });
@@ -109,17 +122,20 @@ export const useStore = create<Store>()(
         });
       },
 
-      removeFromCart: (id, user, location, deviceInfo) => {
-        const product = get().cart.find((item) => item.id === id);
+      removeFromCart: (id, variationId, user, location, deviceInfo) => {
+        const product = get().cart.find(
+          (item) => item.id === id && item.variationId === variationId
+        );
         
-        set((state) => ({
-          cart: state.cart.filter((item) => item.id !== id),
-        }));
+        const newCart = get().cart.filter(
+          (item) => !(item.id === id && item.variationId === variationId)
+        );
+        
+        set({ cart: newCart });
 
         // Sync localStorage and dispatch cart-updated event for count updates
         if (typeof window !== 'undefined') {
-          const cart = get().cart;
-          localStorage.setItem('cartItems', JSON.stringify(cart));
+          localStorage.setItem('cartItems', JSON.stringify(newCart));
           window.dispatchEvent(new CustomEvent('cart-updated'));
         }
 
@@ -133,6 +149,8 @@ export const useStore = create<Store>()(
             metadata: {
               quantity: product.quantity,
               price: product.price,
+              variationId: product.variationId,
+              sku: product.sku,
               ...getEventMetadata(),
             },
           });
@@ -140,16 +158,19 @@ export const useStore = create<Store>()(
 
         console.log("Remove from cart:", {
           productId: id,
+          variationId,
           user,
           location,
           deviceInfo,
         });
       },
 
-      updateCartQuantity: (id, quantity, user, location, deviceInfo) => {
+      updateCartQuantity: (id, variationId, quantity, user, location, deviceInfo) => {
         set((state) => ({
           cart: state.cart.map((item) =>
-            item.id === id ? { ...item, quantity: Math.max(1, quantity) } : item
+            item.id === id && item.variationId === variationId 
+              ? { ...item, quantity: Math.max(1, quantity) } 
+              : item
           ),
         }));
 
@@ -162,6 +183,7 @@ export const useStore = create<Store>()(
 
         console.log("Update cart quantity:", {
           productId: id,
+          variationId,
           quantity,
           user,
           location,

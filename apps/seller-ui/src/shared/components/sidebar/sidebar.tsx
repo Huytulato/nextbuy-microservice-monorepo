@@ -10,7 +10,7 @@ import Logo from 'apps/seller-ui/src/assets/svgs/logo';
 import SidebarItem from './sidebar.item';
 import Home from 'apps/seller-ui/src/assets/icon/home';
 import SidebarMenu from './sidebar.menu';
-import {BellPlus, BellRing, CalendarPlus, ListOrdered, LogOut, Mail, PackageSearch, SquarePlus, TicketPercent } from 'lucide-react';
+import {BellPlus, BellRing, CalendarPlus, ListOrdered, LogOut, Mail, PackageSearch, SquarePlus, TicketPercent, Settings } from 'lucide-react';
 
 const SidebarBarWrapper = () => {
   const {activeSidebar, setActiveSidebar} = useSidebar();
@@ -119,6 +119,12 @@ const SidebarBarWrapper = () => {
               icon={<TicketPercent color={getIconColor('/dashboard/discount-codes')} size={20} />}
               isActive={activeSidebar === '/dashboard/discount-codes'}
               href='/dashboard/discount-codes'
+            />
+            <SidebarItem 
+              title='Settings'
+              icon={<Settings color={getIconColor('/dashboard/setting')} size={20} />}
+              isActive={activeSidebar === '/dashboard/setting'}
+              href='/dashboard/setting'
             />
             <SidebarItem 
               title='Logout'

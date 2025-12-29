@@ -66,14 +66,8 @@ const ShopCard: React.FC<ShopCardProps> = ({ shop }) => {
             {followersCount} {followersCount === 1 ? 'Follower' : 'Followers'}
           </p>
 
-          {/* Address + Rating */}
+          {/* Rating */}
           <div className="flex items-center justify-center gap-3 text-xs text-gray-500 mt-2.5">
-            {shop.address && (
-              <span className="flex items-center gap-1 max-w-[140px]">
-                <MapPin className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">{shop.address}</span>
-              </span>
-            )}
             <span className="flex items-center gap-1">
               <Star className="w-3.5 h-3.5 shrink-0 fill-yellow-400 text-yellow-400" />
               {shop.rating ? shop.rating.toFixed(1) : "N/A"}

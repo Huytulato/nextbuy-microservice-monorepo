@@ -62,10 +62,12 @@ model shops {
   category    String
   images  images[]
   coverBanner String?
+  avatar      String? // Shop Logo/Avatar
   address     String
   opening_hours String
   website     String?
   social_links Json[]
+  shippingSettings Json? // Shipping configuration: {fee: number, methods: string[], estimatedDays: number}
   rating      Float @default(0)
   reviews     shopReviews[]
   sellerId    String @db.ObjectId @unique
@@ -145,6 +147,9 @@ enum productStatus {
   pending
   draft
   rejected
+  hidden
+  banned
+  deleted
 }
 
 model products {
@@ -191,6 +196,44 @@ model products {
   reviewer             admins? @relation("AdminReviewedProducts", fields: [reviewedBy], references: [id])
   orderItems           order_items[]
   history              product_history[]
+  variations           product_variations[]
+  variationGroups      variation_groups[]
+  hasVariations        Boolean @default(false)
+}
+
+model variation_groups {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  productId   String   @db.ObjectId
+  name        String   // "Color", "Size", "Material", etc.
+  options     String[] // ["Red", "Blue", "Green"] or ["S", "M", "L"]
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  product     products @relation(fields: [productId], references: [id])
+  
+  @@index([productId])
+}
+
+model product_variations {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  productId     String   @db.ObjectId
+  sku           String   @unique
+  attributes    Json     // {"color": "Red", "size": "M"}
+  price         Float
+  stock         Int
+  isActive      Boolean  @default(true)
+  isDeleted     Boolean  @default(false)
+  deletedAt     DateTime?
+  hasOrders     Boolean  @default(false) // Track if this variation has orders (prevent hard delete)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  product       products @relation(fields: [productId], references: [id])
+  orderItems    order_items[]
+  
+  @@index([productId])
+  @@index([isActive, isDeleted])
 }
 
 model product_history {
@@ -292,6 +335,7 @@ model order_items {
   id             String   @id @default(auto()) @map("_id") @db.ObjectId
   orderId        String   @db.ObjectId
   productId      String   @db.ObjectId
+  variationId    String?  @db.ObjectId  // Link to specific variation
   quantity       Int
   price          Float
   selectedOptions Json?
@@ -300,6 +344,9 @@ model order_items {
 
   order          orders   @relation(fields: [orderId], references: [id])
   product        products @relation(fields: [productId], references: [id])
+  variation      product_variations? @relation(fields: [variationId], references: [id])
+  
+  @@index([variationId])
 }
 
 model notifications {
