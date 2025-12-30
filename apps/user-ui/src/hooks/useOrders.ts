@@ -5,7 +5,8 @@ import axiosInstance from "../utils/axiosInstance";
 const fetchUserOrders = async () => {
   try {
     const response = await axiosInstance.get('/order/api/user-orders');
-    return response.data.orders || [];
+    // API returns: { success: true, data: { orders: [...] } }
+    return response.data.data?.orders || response.data.orders || [];
   } catch (error: any) {
     if (error.response?.status === 401) {
       return [];
@@ -18,7 +19,8 @@ const fetchUserOrders = async () => {
 const fetchUserOrderDetails = async (orderId: string) => {
   try {
     const response = await axiosInstance.get(`/order/api/user-order-details/${orderId}`);
-    return response.data.order;
+    // API returns: { success: true, data: { order: {...} } }
+    return response.data.data?.order || response.data.order;
   } catch (error: any) {
     if (error.response?.status === 401) {
       return null;

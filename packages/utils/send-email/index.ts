@@ -19,7 +19,7 @@ const transporter = nodemailer.createTransport({
 const renderEmailTemplate = async (templateName: string, data: any): Promise<string> => {
   // Giả định thư mục chứa template nằm ở src/mails hoặc tương tự
   // Bạn cần điều chỉnh đường dẫn này trỏ đúng về folder chứa file .ejs của bạn
-  const templatePath = path.join(__dirname, "../mails", `${templateName}.ejs`);
+  const templatePath = path.join(__dirname, "email-template", `${templateName}.ejs`);
   
   return await ejs.renderFile(templatePath, data);
 };

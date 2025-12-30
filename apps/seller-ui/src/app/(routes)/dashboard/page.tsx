@@ -20,12 +20,12 @@ type OrderRow = {
 
 const fetchSellerOrders = async (): Promise<OrderRow[]> => {
   const res = await axiosInstance.get('/order/api/seller-orders');
-  return res?.data?.orders || [];
+  return res?.data?.data?.orders || [];
 };
 
 const fetchProducts = async () => {
   const res = await axiosInstance.get('/product/api/get-shop-products');
-  return res?.data?.products || [];
+  return res?.data?.data?.products || [];
 };
 
 const statusBadge = (status?: string) => {

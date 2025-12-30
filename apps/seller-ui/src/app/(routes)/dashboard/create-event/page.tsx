@@ -9,12 +9,12 @@ import toast from 'react-hot-toast'
 
 const fetchProducts = async () => {
   const res = await axiosInstance.get('/product/api/get-shop-products');
-  return res?.data?.products || [];
+  return res?.data?.data?.products || [];
 }
 
 const fetchProduct = async (productId: string) => {
   const res = await axiosInstance.get(`/product/api/get-shop-products`);
-  const products = res?.data?.products || [];
+  const products = res?.data?.data?.products || [];
   return products.find((p: any) => p.id === productId);
 }
 

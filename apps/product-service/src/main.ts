@@ -1,41 +1,39 @@
-import express from 'express'; // main framework for building web applications in Node.js
-import "./jobs/product-crone.job"
-import cors from 'cors'; // middleware for enabling CORS (Cross-Origin Resource Sharing)
-import { errorMiddleware } from '@packages/error-handler/error-middleware' // custom error handling middleware
-import cookieParser from 'cookie-parser'; // middleware for parsing cookies, save tokens in cookies
-import swaggerUi from 'swagger-ui-express'; // middleware for serving Swagger UI, which provides a web interface for API documentation
-import router from './routes/product.routes'; // import product routes
-const swaggerDocument = require('./swagger-output.json'); 
+import express from 'express';
+import './jobs/product-crone.job';
+import swaggerUi from 'swagger-ui-express';
+import router from './routes/product.routes';
+import { configureExpressApp, addErrorHandling, createHealthCheckRouter } from '@packages/middleware';
+const swaggerDocument = require('../swagger-output.json');
 
-// start app is server Express
+// Start app as Express server
 const app = express();
 
-// allow frontend to call this API
-app.use(cors({
-  origin: ["http://localhost:3000"],
-  allowedHeaders: ['Authorization','Content-Type'],
-  credentials: true, // allow cookies to be sent with requests
-})
-);
+// Configure Express with common middleware
+configureExpressApp(app, {
+  jsonLimit: '50mb',
+  urlencodedLimit: '50mb',
+});
+
+// Health checks
+const healthRouter = createHealthCheckRouter('product-service', '1.0.0');
+app.use('/', healthRouter);
 
 // Route test
 app.get('/', (req, res) => {
-    res.send({ 'message': 'Product Service is running successfully' });
-}); // test route to check if the server is running when type `http://localhost:6001/` in the browser
+  res.send({ message: 'Product Service is running successfully' });
+});
 
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument)); // serve Swagger UI at /api-docs
-app.get("/docs-json", (req, res) => {
-    res.json(swaggerDocument);
-}); 
+// Swagger documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+app.get('/docs-json', (req, res) => {
+  res.json(swaggerDocument);
+});
 
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
-app.use(cookieParser()); // Parse cookies from requests
+// Routes
+app.use('/api', router);
 
-// Routes 
-app.use("/api", router); // use the authentication router for all routes starting with /api
-
-app.use(errorMiddleware); // use custom error handling middleware to handle errors globally
+// Error handling
+addErrorHandling(app);
 
 // Start server
 const port = process.env.PORT || 6002;

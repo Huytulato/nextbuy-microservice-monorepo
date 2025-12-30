@@ -1,21 +1,27 @@
 import express from 'express'; // main framework for building web applications in Node.js
-import cors from 'cors'; // middleware for enabling CORS (Cross-Origin Resource Sharing)
-import { errorMiddleware } from '@packages/error-handler' // custom error handling middleware
-import cookieParser from 'cookie-parser'; // middleware for parsing cookies, save tokens in cookies
+import { addErrorHandling, createHealthCheckRouter } from '@packages/middleware';
 import router from './routes/auth.router'; // import the router for authentication routes, defines the API endpoints
 import swaggerUi from 'swagger-ui-express'; // middleware for serving Swagger UI, which provides a web interface for API documentation
-const swaggerDocument = require('./swagger-output.json'); 
+import cors from 'cors';
+import cookieParser from 'cookie-parser';
+const swaggerDocument = require('../swagger-output.json'); 
 
 // start app is server Express
 const app = express();
 
-// allow frontend to call this API
+// Manual middleware configuration to fix 400 error
 app.use(cors({
   origin: ["http://localhost:3000"],
   allowedHeaders: ['Authorization','Content-Type'],
-  credentials: true, // allow cookies to be sent with requests
-})
-);
+  credentials: true,
+}));
+app.use(express.json({ limit: "5mb" }));
+app.use(express.urlencoded({ extended: true, limit: "5mb" }));
+app.use(cookieParser());
+
+// Health checks
+const healthRouter = createHealthCheckRouter('auth-service', '1.0.0');
+app.use('/', healthRouter);
 
 // Route test
 app.get('/', (req, res) => {
@@ -27,14 +33,10 @@ app.get("/docs-json", (req, res) => {
     res.json(swaggerDocument);
 }); 
 
-app.use(express.json({ limit: "5mb" }));
-app.use(express.urlencoded({ extended: true, limit: "5mb" }));
-app.use(cookieParser());
-
 // Routes 
 app.use("/api", router); // use the authentication router for all routes starting with /api
 
-app.use(errorMiddleware); // use custom error handling middleware to handle errors globally
+addErrorHandling(app);
 
 // Start server
 const port = process.env.PORT || 6001;

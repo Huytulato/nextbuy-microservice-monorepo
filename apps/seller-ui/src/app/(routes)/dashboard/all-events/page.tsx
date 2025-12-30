@@ -11,7 +11,7 @@ import { Badge } from 'packages/components/ui/badge'
 
 const fetchEvents = async () => {
   const res = await axiosInstance.get('/product/api/get-shop-events');
-  return res?.data?.events || [];
+  return res?.data?.data?.events || [];
 }
 
 const EventList = () => {

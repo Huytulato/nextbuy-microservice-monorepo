@@ -5,23 +5,14 @@
 
 import express from 'express';
 import * as path from 'path';
-import cors from 'cors'; 
-import cookieParser from 'cookie-parser';
-import { errorMiddleware } from '@packages/error-handler';
 import swaggerUi from 'swagger-ui-express';
 import router from './routes/order.route';
-import { createOrder } from './controllers/order.controller';
+import { orderController } from './controllers/order.controller';
 import bodyParser from 'body-parser';
+import { configureExpressApp, addErrorHandling, createHealthCheckRouter } from '@packages/middleware';
 const swaggerDocument = require('../swagger-output.json');
 
 const app = express();
-
-app.use(cors({
-  origin: ["http://localhost:3000"],
-  allowedHeaders: ['Authorization','Content-Type'],
-  credentials: true,
-})
-);
 
 // Stripe webhook endpoint - MUST be before express.json() middleware
 // Path matches API gateway routing: /order/api/create-order
@@ -32,11 +23,15 @@ app.post(
     (req as any).rawBody = req.body;
     next();
   },
-  createOrder 
+  orderController.createOrder 
 );
 
-app.use(express.json());
-app.use(cookieParser());  
+// Configure global middleware (includes cors, json, cookie-parser, morgan)
+configureExpressApp(app);
+
+// Health checks
+const healthRouter = createHealthCheckRouter('order-service', '1.0.0');
+app.use('/', healthRouter);
 
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 
@@ -52,7 +47,8 @@ app.get('/docs-json', (req, res) => {
 // Routes
 app.use('/api', router); 
 
-app.use(errorMiddleware);
+// Error handling
+addErrorHandling(app);
 
 const port = process.env.PORT || 6004;
 const server = app.listen(port, () => {

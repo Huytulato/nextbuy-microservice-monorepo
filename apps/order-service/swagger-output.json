@@ -168,6 +168,27 @@
         }
       }
     },
+    "/admin-order-details/{orderId}": {
+      "get": {
+        "description": "Get order details for admin",
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/user-orders": {
       "get": {
         "description": "",

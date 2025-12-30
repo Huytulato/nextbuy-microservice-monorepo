@@ -51,7 +51,7 @@ const DashboardPage = () => {
     queryFn: async () => {
       if (!editProductId) return null;
       const res = await axiosInstance.get(`/product/api/get-shop-products`);
-      const product = res?.data?.products?.find((p: any) => p.id === editProductId);
+      const product = res?.data?.data?.products?.find((p: any) => p.id === editProductId);
       return product || null;
     },
     enabled: !!editProductId,

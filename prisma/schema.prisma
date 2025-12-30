@@ -166,8 +166,8 @@ model products {
   brand                String?
   colors               String[]
   sizes                String[]
-  starting_date        DateTime
-  ending_date          DateTime
+  starting_date        DateTime?
+  ending_date          DateTime?
   stock                Int
   sale_price           Float
   regular_price       Float
@@ -199,7 +199,9 @@ model products {
   variations           product_variations[]
   variationGroups      variation_groups[]
   hasVariations        Boolean @default(false)
+  totalSales           Int      @default(0)
 }
+
 
 model variation_groups {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
@@ -369,4 +371,163 @@ model moderation_config {
   updatedBy             String?  @db.ObjectId
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+}
+
+// ==================== PAYMENT DOMAIN ====================
+
+enum PaymentStatus {
+  pending
+  processing
+  completed
+  failed
+  refunded
+  partially_refunded
+  cancelled
+}
+
+enum PaymentMethod {
+  credit_card
+  debit_card
+  bank_transfer
+  e_wallet
+  cod
+}
+
+enum TransactionType {
+  charge
+  refund
+  transfer
+  payout
+  platform_fee
+}
+
+enum TransactionStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+enum RefundStatus {
+  pending
+  approved
+  processing
+  completed
+  rejected
+}
+
+model payments {
+  id                  String        @id @default(auto()) @map("_id") @db.ObjectId
+  orderId             String        @db.ObjectId
+  userId              String        @db.ObjectId
+  amount              Float
+  currency            String        @default("usd")
+  method              PaymentMethod
+  status              PaymentStatus @default(pending)
+  gatewayProvider     String        // stripe, vnpay, momo, etc.
+  gatewayPaymentId    String?       @unique // Stripe Payment Intent ID, VNPay txn_ref, etc.
+  gatewayResponse     Json?         // Raw response from payment gateway
+  platformFee         Float         @default(0)
+  sellerAmount        Float         @default(0)
+  metadata            Json?
+  failureReason       String?
+  paidAt              DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  
+  transactions        transactions[]
+  refunds             refunds[]
+  
+  @@index([orderId])
+  @@index([userId])
+  @@index([status])
+  @@index([gatewayProvider])
+}
+
+model transactions {
+  id                  String            @id @default(auto()) @map("_id") @db.ObjectId
+  paymentId           String            @db.ObjectId
+  type                TransactionType
+  amount              Float
+  currency            String            @default("usd")
+  status              TransactionStatus @default(pending)
+  gatewayReference    String?           // External reference from payment gateway
+  sellerId            String?           @db.ObjectId
+  description         String?
+  metadata            Json?
+  processedAt         DateTime?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  
+  payment             payments          @relation(fields: [paymentId], references: [id])
+  
+  @@index([paymentId])
+  @@index([sellerId])
+  @@index([type])
+}
+
+model refunds {
+  id                  String        @id @default(auto()) @map("_id") @db.ObjectId
+  paymentId           String        @db.ObjectId
+  orderId             String        @db.ObjectId
+  userId              String        @db.ObjectId
+  amount              Float
+  currency            String        @default("usd")
+  reason              String?
+  status              RefundStatus  @default(pending)
+  gatewayRefundId     String?       // External refund ID from gateway
+  gatewayResponse     Json?
+  requestedBy         String        @db.ObjectId // User or Admin who requested
+  approvedBy          String?       @db.ObjectId // Admin who approved
+  processedAt         DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  
+  payment             payments      @relation(fields: [paymentId], references: [id])
+  
+  @@index([paymentId])
+  @@index([orderId])
+  @@index([status])
+}
+
+model payment_sessions {
+  id                  String        @id @default(auto()) @map("_id") @db.ObjectId
+  sessionId           String        @unique
+  userId              String        @db.ObjectId
+  cart                Json
+  totalAmount         Float
+  currency            String        @default("usd")
+  shippingAddressId   String?       @db.ObjectId
+  coupon              Json?
+  sellers             Json          // Array of seller info with stripeId
+  status              String        @default("pending") // pending, processing, completed, expired
+  expiresAt           DateTime
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  
+  @@index([userId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model seller_payouts {
+  id                  String        @id @default(auto()) @map("_id") @db.ObjectId
+  sellerId            String        @db.ObjectId
+  amount              Float
+  currency            String        @default("usd")
+  status              String        @default("pending") // pending, processing, completed, failed
+  gatewayPayoutId     String?       // Stripe Transfer ID, etc.
+  bankAccount         Json?         // Bank account info snapshot
+  periodStart         DateTime
+  periodEnd           DateTime
+  ordersCount         Int           @default(0)
+  totalSales          Float         @default(0)
+  totalFees           Float         @default(0)
+  netAmount           Float         @default(0)
+  processedAt         DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  
+  @@index([sellerId])
+  @@index([status])
 }

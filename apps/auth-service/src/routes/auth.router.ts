@@ -1,5 +1,5 @@
 import express, { Router } from "express"; // import routing from express to define API endpoints
-import { userRegistration, verifyUser, loginUser, forgotPassword, resetPassword, verifyUserForgotPasswordOtp, refreshTokens, getUser, logOutUser, verifySeller, registerSeller, loginSeller, getSeller, registerAdmin, loginAdmin, logOutAdmin, getAdmin, updateUserPassword, getUserAddresses, addUserAddress, deleteUserAddress, getNotifications, markNotificationAsRead } from "../controller/auth.controller"; // import the user registration controller function to handle user registration logic
+import { userRegistration, verifyUser, loginUser, forgotPassword, resetPassword, verifyUserForgotPasswordOtp, refreshTokens, getUser, logOutUser, verifySeller, registerSeller, loginSeller, getSeller, registerAdmin, loginAdmin, logOutAdmin, getAdmin, updateUserPassword, getUserAddresses, addUserAddress, deleteUserAddress, getNotifications, markNotificationAsRead } from "../controllers/auth.controller"; // import the user registration controller function to handle user registration logic
 import { isAuthenticated, isSeller, isAdmin } from "@packages/middleware/isAuthenticated";
 
 const router: Router = express.Router(); // create a new router instance

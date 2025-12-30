@@ -14,7 +14,7 @@ export default function OrderDetailPage() {
   const { data: order, isLoading } = useQuery({
     queryKey: ['order-detail', orderId],
     queryFn: async () => {
-      const response = await axiosInstance.get(`/order/api/order-details/${orderId}`);
+      const response = await axiosInstance.get(`/order/api/admin-order-details/${orderId}`);
       return response.data.order;
     },
     enabled: !!orderId,

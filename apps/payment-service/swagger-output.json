@@ -1,0 +1,28 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "NextBuy Payment Service API",
+    "description": "Payment processing service for NextBuy e-commerce platform",
+    "version": "1.0.0"
+  },
+  "host": "localhost:6007",
+  "basePath": "/api",
+  "schemes": ["http"],
+  "consumes": ["application/json"],
+  "produces": ["application/json"],
+  "tags": [
+    {
+      "name": "Payments",
+      "description": "Payment processing endpoints"
+    },
+    {
+      "name": "Refunds",
+      "description": "Refund management endpoints"
+    },
+    {
+      "name": "Webhooks",
+      "description": "Payment gateway webhook endpoints"
+    }
+  ],
+  "paths": {}
+}

@@ -71,13 +71,20 @@ const CartPage = () => {
         }
       );
 
-      const sessionId = res.data.sessionId;
+      console.log('Session response:', res.data);
+      // Backend wraps response in { success, message, data }
+      const sessionId = res.data.data?.sessionId || res.data.sessionId;
+      console.log('Session ID:', sessionId);
       // Store sessionId in localStorage for reuse detection on return
       if (sessionId) {
         localStorage.setItem('lastSessionId', sessionId);
         localStorage.setItem('lastCartHash', cartHash);
+        console.log('Redirecting to checkout with sessionId:', sessionId);
+        router.push(`/checkout?sessionId=${sessionId}`);
+      } else {
+        console.error('No sessionId in response:', res.data);
+        toast.error("Failed to get session ID from server.");
       }
-      router.push(`/checkout?sessionId=${sessionId}`);
     } catch (error: any) {
       console.error('Session creation error:', error);
       toast.error("Failed to create payment session. Please try again.");

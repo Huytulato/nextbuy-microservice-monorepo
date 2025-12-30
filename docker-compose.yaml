@@ -24,3 +24,22 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  # Payment Service (Port 6007)
+  # payment-service:
+  #   build:
+  #     context: .
+  #     dockerfile: apps/payment-service/Dockerfile
+  #   container_name: nextbuy-payment-service
+  #   ports:
+  #     - "6007:6007"
+  #   environment:
+  #     - PORT=6007
+  #     - DATABASE_URL=${DATABASE_URL}
+  #     - REDIS_URL=${REDIS_URL}
+  #     - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+  #     - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+  #     - KAFKA_BROKERS=kafka:9092
+  #   depends_on:
+  #     - kafka
+  

@@ -6,10 +6,22 @@ import ProductDetails from 'apps/user-ui/src/shared/modules/product/product-deta
 async function fetchProductDetails(slug: string) {
   try {
     // product-service routes are mounted under /api and exposed via gateway at /product
+    // BaseController returns { success: true, data: { product: ... } }
     const response = await axiosInstance.get(`/product/api/get-product/${slug}`);
-    return response.data.product;
-  } catch (error) {
+    const product = response.data?.data?.product;
+    
+    if (!product) {
+      console.warn(`Product with slug "${slug}" not found in response`);
+      return null;
+    }
+    
+    return product;
+  } catch (error: any) {
     console.error('Error fetching product:', error);
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', error.response.data);
+    }
     return null;
   }
 }

@@ -12,7 +12,7 @@ import { Badge } from 'packages/components/ui/badge'
 
 const fetchProducts = async () => {
   const res = await axiosInstance.get('/product/api/get-shop-products');
-  return res?.data?.products;
+  return res?.data?.data?.products;
 }
 
 const deleteProduct = async (productId: string) => {

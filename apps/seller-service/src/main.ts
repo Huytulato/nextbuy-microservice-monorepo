@@ -1,22 +1,16 @@
 import express from 'express';
-import cookieParser from 'cookie-parser';
-import cors from 'cors';
-import { errorMiddleware } from '@packages/error-handler';
+import { configureExpressApp, addErrorHandling, createHealthCheckRouter } from '@packages/middleware';
 import swaggerUi from 'swagger-ui-express';
 import router from './routes/seller.route';
 const swaggerDocument = require('../swagger-output.json');
 
 const app = express();
 
-app.use(cors({
-  origin: ["http://localhost:3000"],
-  allowedHeaders: ['Authorization','Content-Type'],
-  credentials: true,
-}));
+configureExpressApp(app, { jsonLimit: "5mb", urlencodedLimit: "5mb" });
 
-app.use(express.json({ limit: "5mb" }));
-app.use(express.urlencoded({ extended: true, limit: "5mb" }));
-app.use(cookieParser());
+// Health checks
+const healthRouter = createHealthCheckRouter('seller-service', '1.0.0');
+app.use('/', healthRouter);
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 app.get('/docs-json', (req, res) => {
@@ -25,7 +19,7 @@ app.get('/docs-json', (req, res) => {
 
 app.use("/api", router);
 
-app.use(errorMiddleware);
+addErrorHandling(app);
 
 const port = process.env.PORT || 6003;
 const server = app.listen(port, () => {

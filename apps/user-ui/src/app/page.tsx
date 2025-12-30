@@ -8,7 +8,7 @@ import axiosInstance from '../utils/axiosInstance'
 import ProductCard from '../shared/components/cards/product-card'
 import ShopCard from '../shared/components/cards/shop-card'
 
-type Shop = {
+interface Shop {
   id: string
   name: string
   description?: string
@@ -27,37 +27,69 @@ const HomePage = () => {
   } = useQuery({
     queryKey: ['products', 'suggested'],
     queryFn: async () => {
-      const res = await axiosInstance.get('/product/api/get-all-products?page=1&limit=8')
-      return res.data.products
+      try {
+        const res = await axiosInstance.get('/product/api/get-all-products?page=1&limit=8')
+        // BaseController returns { success: true, data: { products: [...] } }
+        return res.data?.data?.products || []
+      } catch (error) {
+        console.error('Error fetching suggested products:', error)
+        return []
+      }
     },
     staleTime: 2 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
   })
 
   const { data: latestProducts, isLoading: isLatestLoading } = useQuery({
     queryKey: ['products', 'latest'],
     queryFn: async () => {
-      const res = await axiosInstance.get('/product/api/get-all-products?page=1&limit=8&type=latest')
-      return res.data.products
+      try {
+        const res = await axiosInstance.get('/product/api/get-all-products?page=1&limit=8&type=latest')
+        // BaseController returns { success: true, data: { products: [...] } }
+        return res.data?.data?.products || []
+      } catch (error) {
+        console.error('Error fetching latest products:', error)
+        return []
+      }
     },
     staleTime: 2 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
   })
 
   const { data: topOffers, isLoading: isOffersLoading } = useQuery({
     queryKey: ['products', 'offers'],
     queryFn: async () => {
-      const res = await axiosInstance.get('/product/api/get-all-events?limit=8')
-      return res.data.events
+      try {
+        const res = await axiosInstance.get('/product/api/get-all-events?limit=8')
+        // BaseController returns { success: true, data: { events: [...] } }
+        return res.data?.data?.events || []
+      } catch (error) {
+        console.error('Error fetching top offers:', error)
+        return []
+      }
     },
     staleTime: 2 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
   })
 
   const { data: topShops, isLoading: isShopsLoading } = useQuery({
     queryKey: ['shops', 'top'],
     queryFn: async () => {
-      const res = await axiosInstance.get('/product/api/top-shops')
-      return res.data.topShops as Shop[]
+      try {
+        const res = await axiosInstance.get('/shop/api/top-shops')
+        // Seller service returns { success: true, topShops: [...] }
+        return res.data?.topShops || []
+      } catch (error) {
+        console.error('Error fetching top shops:', error)
+        return []
+      }
     },
     staleTime: 5 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
   })
 
   const renderProductsSection = (
@@ -104,7 +136,7 @@ const HomePage = () => {
             </div>
           ) : topShops && topShops.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-              {topShops.map((shop) => (
+              {topShops.map((shop: Shop) => (
                 <ShopCard key={shop.id} shop={shop} />
               ))}
             </div>

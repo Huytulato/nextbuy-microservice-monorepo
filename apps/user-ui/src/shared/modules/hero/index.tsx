@@ -167,6 +167,10 @@ const Hero = () => {
                       src={currentBanner.image}
                       alt={currentBanner.title}
                       className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
+                      onError={(e) => {
+                        // Hide image if it fails to load
+                        e.currentTarget.style.display = 'none'
+                      }}
                     />
                   </div>
 

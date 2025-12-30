@@ -1,13 +1,16 @@
 import express from 'express';
-import cookieParser from 'cookie-parser';
-import { errorMiddleware } from '@packages/error-handler';
+import { configureExpressApp, addErrorHandling, createHealthCheckRouter } from '@packages/middleware';
 import swaggerUi from 'swagger-ui-express';
 import router from './routes/admin.route';
 const swaggerDocument = require('../swagger-output.json');
 
 const app = express();
-app.use(express.json());
-app.use(cookieParser());
+
+configureExpressApp(app);
+
+// Health checks
+const healthRouter = createHealthCheckRouter('admin-service', '1.0.0');
+app.use('/', healthRouter);
 
 app.get('/', (req, res) => {
   res.send({ message: 'Welcome to admin-service!' });
@@ -21,7 +24,7 @@ app.get('/docs-json', (req, res) => {
 // routes 
 app.use("/api", router);
 
-app.use(errorMiddleware)
+addErrorHandling(app);
 
 const port = process.env.PORT || 6005;
 const server = app.listen(port, () => {

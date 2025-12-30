@@ -15,7 +15,7 @@ type OrderRow = {
 
 const fetchSellerOrders = async (): Promise<OrderRow[]> => {
   const res = await axiosInstance.get('/order/api/seller-orders');
-  return res?.data?.orders || [];
+  return res?.data?.data?.orders || [];
 };
 
 const formatCurrency = (amount: number) => {

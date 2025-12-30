@@ -36,7 +36,8 @@ const CheckoutPage = () => {
       // Wait for auth check
       if (userLoading) return;
 
-      if (!sessionId) {
+      // Guard against undefined/null/empty sessionId - don't call API
+      if (!sessionId || sessionId === 'undefined' || sessionId === 'null') {
         setError("No session ID provided. Redirecting to cart...");
         setLoading(false);
         setTimeout(() => router.push("/cart"), 2000);
@@ -50,9 +51,12 @@ const CheckoutPage = () => {
           { withCredentials: true }
         );
 
-        const sessionData = verifyRes.data.session;
+        console.log('Verify response:', verifyRes.data);
+        // Backend wraps response: { success, data: { session: {...} } }
+        const sessionData = verifyRes.data.data?.session || verifyRes.data.session;
 
         if (!sessionData) {
+          console.error('No session data in response:', verifyRes.data);
           throw new Error("Session data not found");
         }
 
@@ -88,9 +92,12 @@ const CheckoutPage = () => {
           { withCredentials: true }
         );
 
-        const clientSecretValue = intentRes.data.clientSecret;
+        console.log('Payment intent response:', intentRes.data);
+        // Backend wraps response: { success, data: { clientSecret: ... } }
+        const clientSecretValue = intentRes.data.data?.clientSecret || intentRes.data.clientSecret;
         console.log('Client secret received:', clientSecretValue ? 'Yes' : 'No');
         if (!clientSecretValue) {
+          console.error('No client secret in response:', intentRes.data);
           throw new Error("Client secret not received from server");
         }
         setClientSecret(clientSecretValue);

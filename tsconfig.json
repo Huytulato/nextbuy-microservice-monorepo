@@ -38,6 +38,9 @@
     },
     {
       "path": "./apps/admin-ui"
+    },
+    {
+      "path": "./apps/payment-service"
     }
   ]
 }

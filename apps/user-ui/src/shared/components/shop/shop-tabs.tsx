@@ -22,10 +22,22 @@ const ShopTabs: React.FC<ShopTabsProps> = ({ shopId }) => {
   const { data: productsData, isLoading: isLoadingProducts } = useQuery({
     queryKey: ['shop-products', shopId, productsPage],
     queryFn: async () => {
-      const res = await axiosInstance.get(
-        `/shop/api/get-shop-products/${shopId}?page=${productsPage}&limit=${limit}`
-      );
-      return res.data;
+      try {
+        const res = await axiosInstance.get(
+          `/product/api/get-shop-products/${shopId}?page=${productsPage}&limit=${limit}`
+        );
+        // BaseController.paginated() returns { success: true, data: [...], pagination: {...} }
+        return {
+          products: res.data?.data || [],
+          pagination: res.data?.pagination || {}
+        };
+      } catch (error) {
+        console.error('Error fetching shop products:', error);
+        return {
+          products: [],
+          pagination: {}
+        };
+      }
     },
     enabled: activeTab === 'products' || activeTab === 'offers',
   });

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, use } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -34,16 +34,16 @@ const formatDate = (iso?: string) => {
 
 const fetchOrder = async (id: string) => {
   const res = await axiosInstance.get(`/order/api/order-details/${id}`);
-  return res?.data?.order;
+  return res?.data?.data?.order;
 };
 
 const updateDelivery = async (id: string, deliveryStatus: DeliveryStatus) => {
   const res = await axiosInstance.put(`/order/api/order-delivery-status/${id}`, { deliveryStatus });
-  return res?.data?.order;
+  return res?.data?.data?.order;
 };
 
-export default function OrderDetailsPage({ params }: { params: { id: string } }) {
-  const orderId = params.id;
+export default function OrderDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: orderId } = use(params);
   const queryClient = useQueryClient();
 
   const { data: order, isLoading } = useQuery({
